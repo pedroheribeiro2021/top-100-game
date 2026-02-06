@@ -1,7 +1,5 @@
 {
   "dependencies": {
-    "@fastify/express": "^4.0.4",
-    "express": "^5.2.1",
     "firebase-functions": "^7.0.5"
   }
 }
