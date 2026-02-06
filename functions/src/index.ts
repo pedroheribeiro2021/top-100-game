@@ -1,20 +1,17 @@
-import Fastify from 'fastify';
+import { buildServer } from './app/server'
 
-const server = Fastify({
-  logger: true,
-});
+const app = buildServer()
 
-server.get('/health', async () => {
-  return { status: 'ok' };
-});
+// ⚠️ APENAS para desenvolvimento local
+if (process.env.NODE_ENV !== 'production') {
+  app.listen({ port: 3000 }, (err, address) => {
+    if (err) {
+      app.log.error(err)
+      process.exit(1)
+    }
+    app.log.info(`🚀 Server running at ${address}`)
+  })
+}
 
-const start = async () => {
-  try {
-    await server.listen({ port: 3000, host: '0.0.0.0' });
-  } catch (err) {
-    server.log.error(err);
-    process.exit(1);
-  }
-};
-
-start();
+// Firebase adapter entra na próxima etapa
+export default app
