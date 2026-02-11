@@ -7,3 +7,7 @@ export * from './valueObjects/NormalizedGuess'
 export * from './valueObjects/Score'
 
 export * from './services/GuessNormalizer'
+export * from './services/GuessMatcher'
+export * from './services/ScoreCalculator'
+
+export * from './rules/SubjectiveGuessRule'
