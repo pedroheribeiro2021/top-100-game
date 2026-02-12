@@ -1,8 +1,8 @@
-import { CreateGameUseCase } from '../../../domain/game/useCases/CreateGameUseCase';
-import { GetGameByIdUseCase } from '../../../domain/game/useCases/GetGameByIdUseCase';
-import { GameRepository } from '../../../domain/game/repositories/GameRepository';
-import { CreateGameDTO } from '../../dtos/CreateGameDTO';
-import { GameResponseDTO } from '../../dtos/GameResponseDTO';
+import { CreateGameUseCase } from '../../domain/game/useCases/CreateGameUseCase';
+import { GetGameByIdUseCase } from '../../domain/game/useCases/GetGameByIdUseCase';
+import { GameRepository } from '../../domain/game/repositories/GameRepository';
+import { CreateGameDTO } from '../dtos/CreateGameDTO';
+import { GameResponseDTO } from '../dtos/GameResponseDTO';
 
 export class GameFacade {
   private readonly createGameUseCase: CreateGameUseCase;
