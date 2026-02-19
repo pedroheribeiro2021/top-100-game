@@ -1,19 +1,15 @@
-import { buildServer } from './app/server';
+import * as functions from 'firebase-functions'
+import express from 'express'
+import { gamesRoutes } from './routes/games.routes'
 
-export { api } from './app/firebaseAdapter';
+const app = express()
 
-const app = buildServer();
+app.use(express.json())
 
-// ⚠️ APENAS para desenvolvimento local
-if (process.env.NODE_ENV !== 'production') {
-  app.listen({ port: 3000 }, (err, address) => {
-    if (err) {
-      app.log.error(err);
-      process.exit(1);
-    }
-    app.log.info(`🚀 Server running at ${address}`);
-  });
-}
+app.use('/games', gamesRoutes)
 
-// Firebase adapter entra na próxima etapa
-export default app;
+app.get('/health', (_, res) => {
+  res.json({ status: 'ok' })
+})
+
+export const api = functions.https.onRequest(app)
