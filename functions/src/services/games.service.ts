@@ -1,34 +1,37 @@
-import { db } from '../config/firestore'
-import { randomUUID } from 'crypto'
-import { generateGameCode } from '../utils/generateGameCode'
+import { db } from '../config/firestore';
+import { randomUUID } from 'crypto';
+import { generateGameCode } from '../utils/generateGameCode';
+import { generateRanking } from './generateRanking';
 
 export async function createGame(theme: string) {
-  const id = randomUUID()
-  const gameCode = generateGameCode()
+  const id = randomUUID();
+  const gameCode = generateGameCode();
+
+  const ranking = await generateRanking(theme);
 
   const game = {
     id,
     theme,
-    status: 'CREATED',
+    status: 'RANKING_READY',
     players: [],
-    ranking: null,
+    ranking,
     currentRound: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     gameCode,
-  }
+  };
 
-  await db.collection('games').doc(id).set(game)
+  await db.collection('games').doc(id).set(game);
 
-  return game
+  return game;
 }
 
 export async function getGameById(id: string) {
-  const doc = await db.collection('games').doc(id).get()
+  const doc = await db.collection('games').doc(id).get();
 
-  if (!doc.exists) return null
+  if (!doc.exists) return null;
 
-  return doc.data()
+  return doc.data();
 }
 
 export async function getGameByCode(code: string) {
@@ -36,9 +39,9 @@ export async function getGameByCode(code: string) {
     .collection('games')
     .where('gameCode', '==', code)
     .limit(1)
-    .get()
+    .get();
 
-  if (snapshot.empty) return null
+  if (snapshot.empty) return null;
 
-  return snapshot.docs[0].data()
+  return snapshot.docs[0].data();
 }
