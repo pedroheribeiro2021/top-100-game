@@ -128,6 +128,8 @@ export async function submitAnswer(
 
   if (!game) throw new Error('GAME_NOT_FOUND');
 
+  if (game.status === 'FINISHED') throw new Error('GAME_FINISHED');
+
   if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
 
   const player = game.players.find((p: any) => p.id === playerId);
@@ -156,7 +158,8 @@ export async function submitAnswer(
 
   let updatedPlayers = game.players;
   let nextRound = game.currentRound;
-  const newStatus = game.status;
+  let newStatus = game.status;
+  const maxRounds = 5;
 
   // 🔥 Se todos responderam
   if (updatedAnswers.length === game.players.length) {
@@ -173,6 +176,10 @@ export async function submitAnswer(
     });
 
     nextRound = game.currentRound + 1;
+
+    if (nextRound > maxRounds) {
+      newStatus = 'FINISHED';
+    }
   }
 
   await db
@@ -183,6 +190,7 @@ export async function submitAnswer(
       currentRoundAnswers:
         updatedAnswers.length === game.players.length ? [] : updatedAnswers,
       currentRound: nextRound,
+      status: newStatus,
       updatedAt: new Date(),
     });
 
