@@ -154,10 +154,37 @@ export async function submitAnswer(
 
   const updatedAnswers = [...(game.currentRoundAnswers || []), newAnswer];
 
-  await db.collection('games').doc(gameId).update({
-    currentRoundAnswers: updatedAnswers,
-    updatedAt: new Date(),
-  });
+  let updatedPlayers = game.players;
+  let nextRound = game.currentRound;
+  const newStatus = game.status;
+
+  // 🔥 Se todos responderam
+  if (updatedAnswers.length === game.players.length) {
+    // somar pontos
+    updatedPlayers = game.players.map((player: any) => {
+      const playerAnswer = updatedAnswers.find(
+        (a: any) => a.playerId === player.id,
+      );
+
+      return {
+        ...player,
+        score: player.score + (playerAnswer?.points || 0),
+      };
+    });
+
+    nextRound = game.currentRound + 1;
+  }
+
+  await db
+    .collection('games')
+    .doc(gameId)
+    .update({
+      players: updatedPlayers,
+      currentRoundAnswers:
+        updatedAnswers.length === game.players.length ? [] : updatedAnswers,
+      currentRound: nextRound,
+      updatedAt: new Date(),
+    });
 
   return newAnswer;
 }
