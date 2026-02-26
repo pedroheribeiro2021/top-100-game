@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getGameByCode } from "@/services/api";
+import { getGameById } from "@/services/api";
 import { Game } from "@/types/game";
 
 export default function GamePage() {
@@ -11,7 +11,7 @@ export default function GamePage() {
 
   useEffect(() => {
     async function loadGame() {
-      const data = await getGameByCode(code as string);
+      const data = await getGameById(code as string);
       setGame(data);
     }
     loadGame();
