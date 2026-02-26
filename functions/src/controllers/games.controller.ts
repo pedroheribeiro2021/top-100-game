@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response } from 'express';
-import { createGame, getGameById } from '../services/games.service';
+import { createGame, getGameById, joinGame } from '../services/games.service';
 
 export async function createGameHandler(req: Request, res: Response) {
   try {
@@ -28,4 +29,28 @@ export async function getGameHandler(req: Request, res: Response) {
   }
 
   return res.status(200).json(game);
+}
+
+export async function joinGameHandler(req: Request, res: Response) {
+  try {
+    const { gameCode, playerName } = req.body
+
+    if (!gameCode || !playerName) {
+      return res.status(400).json({ error: 'gameCode and playerName are required' })
+    }
+
+    const player = await joinGame(gameCode, playerName)
+
+    return res.status(200).json(player)
+  } catch (error: any) {
+    if (error.message === 'GAME_NOT_FOUND') {
+      return res.status(404).json({ error: 'Game not found' })
+    }
+
+    if (error.message === 'GAME_ALREADY_STARTED') {
+      return res.status(400).json({ error: 'Game already started' })
+    }
+
+    return res.status(500).json({ error: 'Internal server error' })
+  }
 }

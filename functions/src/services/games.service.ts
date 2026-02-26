@@ -45,3 +45,37 @@ export async function getGameByCode(code: string) {
 
   return snapshot.docs[0].data();
 }
+
+export async function joinGame(gameCode: string, playerName: string) {
+  const snapshot = await db
+    .collection('games')
+    .where('gameCode', '==', gameCode)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    throw new Error('GAME_NOT_FOUND');
+  }
+
+  const doc = snapshot.docs[0];
+  const game = doc.data();
+
+  if (game.status !== 'RANKING_READY') {
+    throw new Error('GAME_ALREADY_STARTED');
+  }
+
+  const newPlayer = {
+    id: randomUUID(),
+    name: playerName,
+    score: 0,
+  };
+
+  const updatedPlayers = [...(game.players || []), newPlayer];
+
+  await db.collection('games').doc(doc.id).update({
+    players: updatedPlayers,
+    updatedAt: new Date(),
+  });
+
+  return newPlayer;
+}
