@@ -66,6 +66,9 @@ export async function submitAnswer(
     body: JSON.stringify({ playerId, answer }),
   });
 
-  if (!response.ok) throw new Error("Failed to submit answer");
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to submit answer");
+  }
   return response.json();
 }
