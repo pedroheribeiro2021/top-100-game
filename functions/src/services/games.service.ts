@@ -79,3 +79,36 @@ export async function joinGame(gameCode: string, playerName: string) {
 
   return newPlayer;
 }
+
+export async function startGame(gameId: string) {
+  const doc = await db.collection('games').doc(gameId).get();
+
+  if (!doc.exists) {
+    throw new Error('GAME_NOT_FOUND');
+  }
+
+  const game = doc.data();
+
+  if (!game) {
+    throw new Error('GAME_NOT_FOUND');
+  }
+
+  if (game.status !== 'RANKING_READY') {
+    throw new Error('INVALID_GAME_STATE');
+  }
+
+  if (!game.players || game.players.length === 0) {
+    throw new Error('NO_PLAYERS');
+  }
+
+  await db.collection('games').doc(gameId).update({
+    status: 'STARTED',
+    currentRound: 1,
+    updatedAt: new Date(),
+  });
+
+  return {
+    message: 'Game started',
+    currentRound: 1,
+  };
+}
