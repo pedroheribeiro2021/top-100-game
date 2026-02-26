@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { db } from '../config/firestore';
 import { randomUUID } from 'crypto';
 import { generateGameCode } from '../utils/generateGameCode';
@@ -104,6 +105,7 @@ export async function startGame(gameId: string) {
   await db.collection('games').doc(gameId).update({
     status: 'STARTED',
     currentRound: 1,
+    currentRoundAnswers: [],
     updatedAt: new Date(),
   });
 
@@ -111,4 +113,51 @@ export async function startGame(gameId: string) {
     message: 'Game started',
     currentRound: 1,
   };
+}
+
+export async function submitAnswer(
+  gameId: string,
+  playerId: string,
+  answer: string,
+) {
+  const doc = await db.collection('games').doc(gameId).get();
+
+  if (!doc.exists) throw new Error('GAME_NOT_FOUND');
+
+  const game = doc.data();
+
+  if (!game) throw new Error('GAME_NOT_FOUND');
+
+  if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
+
+  const player = game.players.find((p: any) => p.id === playerId);
+
+  if (!player) throw new Error('PLAYER_NOT_FOUND');
+
+  const alreadyAnswered = (game.currentRoundAnswers || []).some(
+    (a: any) => a.playerId === playerId,
+  );
+
+  if (alreadyAnswered) throw new Error('ALREADY_ANSWERED');
+
+  const rankingItem = game.ranking.find(
+    (item: any) => item.value.toLowerCase() === answer.toLowerCase(),
+  );
+
+  const points = rankingItem ? rankingItem.position : 0;
+
+  const newAnswer = {
+    playerId,
+    answer,
+    points,
+  };
+
+  const updatedAnswers = [...(game.currentRoundAnswers || []), newAnswer];
+
+  await db.collection('games').doc(gameId).update({
+    currentRoundAnswers: updatedAnswers,
+    updatedAt: new Date(),
+  });
+
+  return newAnswer;
 }
