@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getGameById, joinGame, startGame } from "@/services/api";
+import { getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
 import { Game, Player } from "@/types/game";
 
 export default function GamePage() {
@@ -29,7 +29,8 @@ export default function GamePage() {
 
     try {
       setLoading(true);
-      await joinGame(game!.gameCode, playerName);
+      const player = await joinGame(game!.gameCode, playerName);
+      localStorage.setItem("playerId", player.id);
       setPlayerName("");
       await loadGame();
     } catch (error) {
@@ -100,10 +101,8 @@ export default function GamePage() {
         </div>
       )}
 
-      {game.status === "IN_PROGRESS" && (
-        <div className="mt-6">
-          <p>Jogo em andamento...</p>
-        </div>
+      {game.status === "STARTED" && (
+        <RoundSection game={game} reload={loadGame} />
       )}
 
       {game.status === "FINISHED" && (
@@ -112,5 +111,72 @@ export default function GamePage() {
         </div>
       )}
     </main>
+  );
+}
+
+function RoundSection({
+  game,
+  reload,
+}: {
+  game: Game;
+  reload: () => Promise<void>;
+}) {
+  const [answer, setAnswer] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    if (!answer) return alert("Digite uma resposta");
+
+    const playerId = localStorage.getItem("playerId");
+
+    if (!playerId) {
+      return alert("Você precisa entrar na sala primeiro");
+    }
+
+    try {
+      setSubmitting(true);
+      await submitAnswer(game.id, playerId, answer);
+      setAnswer("");
+      await reload();
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mt-6 space-y-4">
+      <h2 className="font-bold">Rodada {game.currentRound}</h2>
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Sua resposta"
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          className="p-2 rounded bg-gray-800"
+        />
+
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="bg-blue-600 px-4 rounded"
+        >
+          Enviar
+        </button>
+      </div>
+
+      <div>
+        <h3 className="font-bold">Placar:</h3>
+        <ul>
+          {game.players.map((player) => (
+            <li key={player.id}>
+              {player.name} - {player.score} pts
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }

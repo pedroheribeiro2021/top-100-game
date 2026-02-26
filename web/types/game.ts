@@ -12,7 +12,7 @@ export type RankingItem = {
 export type GameStatus =
   | "WAITING_PLAYERS"
   | "RANKING_READY"
-  | "IN_PROGRESS"
+  | "STARTED"
   | "FINISHED";
 
 export type Game = {
