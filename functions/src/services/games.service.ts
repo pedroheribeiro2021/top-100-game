@@ -182,6 +182,14 @@ export async function submitAnswer(
     }
   }
 
+  let winner = null;
+
+  if (newStatus === 'FINISHED') {
+    const sortedPlayers = [...updatedPlayers].sort((a, b) => b.score - a.score);
+
+    winner = sortedPlayers[0];
+  }
+
   await db
     .collection('games')
     .doc(gameId)
@@ -191,6 +199,7 @@ export async function submitAnswer(
         updatedAnswers.length === game.players.length ? [] : updatedAnswers,
       currentRound: nextRound,
       status: newStatus,
+      winner: winner || null,
       updatedAt: new Date(),
     });
 
