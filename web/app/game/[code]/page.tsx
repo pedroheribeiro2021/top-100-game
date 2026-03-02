@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
 import { Game, Player } from "@/types/game";
+import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
 
 export default function GamePage() {
   const { code } = useParams();
   const [game, setGame] = useState<Game | null>(null);
   const [playerName, setPlayerName] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const currentPlayer = useCurrentPlayer(game);
 
   async function loadGame() {
     const data = await getGameById(code as string);
@@ -83,7 +86,14 @@ export default function GamePage() {
             <h2 className="font-bold">Jogadores:</h2>
             <ul>
               {game.players.map((player: Player) => (
-                <li key={player.id}>
+                <li
+                  key={player.id}
+                  className={`${
+                    currentPlayer?.id === player.id
+                      ? "text-green-400 font-bold"
+                      : ""
+                  }`}
+                >
                   {player.name} - {player.score} pts
                 </li>
               ))}
