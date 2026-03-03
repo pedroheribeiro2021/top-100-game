@@ -4,19 +4,23 @@ import { randomUUID } from 'crypto';
 import { generateGameCode } from '../utils/generateGameCode';
 import { generateRanking } from './generateRanking';
 
+const MAX_ROUNDS = 5;
+
 export async function createGame(theme: string) {
   const id = randomUUID();
   const gameCode = generateGameCode();
-
   const ranking = await generateRanking(theme);
 
   const game = {
     id,
     theme,
     status: 'RANKING_READY',
+    roundPhase: null,
     players: [],
     ranking,
     currentRound: 0,
+    currentRoundAnswers: [],
+    winner: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     gameCode,
@@ -29,9 +33,7 @@ export async function createGame(theme: string) {
 
 export async function getGameById(id: string) {
   const doc = await db.collection('games').doc(id).get();
-
   if (!doc.exists) return null;
-
   return doc.data();
 }
 
@@ -84,15 +86,10 @@ export async function joinGame(gameCode: string, playerName: string) {
 export async function startGame(gameId: string) {
   const doc = await db.collection('games').doc(gameId).get();
 
-  if (!doc.exists) {
-    throw new Error('GAME_NOT_FOUND');
-  }
+  if (!doc.exists) throw new Error('GAME_NOT_FOUND');
 
   const game = doc.data();
-
-  if (!game) {
-    throw new Error('GAME_NOT_FOUND');
-  }
+  if (!game) throw new Error('GAME_NOT_FOUND');
 
   if (game.status !== 'RANKING_READY') {
     throw new Error('INVALID_GAME_STATE');
@@ -104,6 +101,7 @@ export async function startGame(gameId: string) {
 
   await db.collection('games').doc(gameId).update({
     status: 'STARTED',
+    roundPhase: 'ANSWERING',
     currentRound: 1,
     currentRoundAnswers: [],
     updatedAt: new Date(),
@@ -121,19 +119,17 @@ export async function submitAnswer(
   answer: string,
 ) {
   const doc = await db.collection('games').doc(gameId).get();
-
   if (!doc.exists) throw new Error('GAME_NOT_FOUND');
 
   const game = doc.data();
-
   if (!game) throw new Error('GAME_NOT_FOUND');
 
   if (game.status === 'FINISHED') throw new Error('GAME_FINISHED');
-
   if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
+  if (game.roundPhase !== 'ANSWERING')
+    throw new Error('ROUND_NOT_ACCEPTING_ANSWERS');
 
   const player = game.players.find((p: any) => p.id === playerId);
-
   if (!player) throw new Error('PLAYER_NOT_FOUND');
 
   const alreadyAnswered = (game.currentRoundAnswers || []).some(
@@ -157,13 +153,12 @@ export async function submitAnswer(
   const updatedAnswers = [...(game.currentRoundAnswers || []), newAnswer];
 
   let updatedPlayers = game.players;
-  let nextRound = game.currentRound;
+  let newRoundPhase = 'ANSWERING';
   let newStatus = game.status;
-  const maxRounds = 5;
+  let winner = game.winner || null;
 
-  // 🔥 Se todos responderam
+  // 🔥 Se todos responderam → muda para RESULT
   if (updatedAnswers.length === game.players.length) {
-    // somar pontos
     updatedPlayers = game.players.map((player: any) => {
       const playerAnswer = updatedAnswers.find(
         (a: any) => a.playerId === player.id,
@@ -175,33 +170,53 @@ export async function submitAnswer(
       };
     });
 
-    nextRound = game.currentRound + 1;
+    newRoundPhase = 'RESULT';
 
-    if (nextRound > maxRounds) {
+    // Se for última rodada, finaliza
+    if (game.currentRound >= MAX_ROUNDS) {
       newStatus = 'FINISHED';
+
+      const sortedPlayers = [...updatedPlayers].sort(
+        (a, b) => b.score - a.score,
+      );
+
+      winner = sortedPlayers[0];
     }
   }
 
-  let winner = null;
-
-  if (newStatus === 'FINISHED') {
-    const sortedPlayers = [...updatedPlayers].sort((a, b) => b.score - a.score);
-
-    winner = sortedPlayers[0];
-  }
-
-  await db
-    .collection('games')
-    .doc(gameId)
-    .update({
-      players: updatedPlayers,
-      currentRoundAnswers:
-        updatedAnswers.length === game.players.length ? [] : updatedAnswers,
-      currentRound: nextRound,
-      status: newStatus,
-      winner: winner || null,
-      updatedAt: new Date(),
-    });
+  await db.collection('games').doc(gameId).update({
+    players: updatedPlayers,
+    currentRoundAnswers: updatedAnswers,
+    roundPhase: newRoundPhase,
+    status: newStatus,
+    winner,
+    updatedAt: new Date(),
+  });
 
   return newAnswer;
+}
+
+/**
+ * Avança rodada manualmente (chamar após exibir RESULT no frontend)
+ */
+export async function advanceRound(gameId: string) {
+  const doc = await db.collection('games').doc(gameId).get();
+  if (!doc.exists) throw new Error('GAME_NOT_FOUND');
+
+  const game = doc.data();
+  if (!game) throw new Error('GAME_NOT_FOUND');
+
+  if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
+  if (game.roundPhase !== 'RESULT') throw new Error('ROUND_NOT_READY');
+
+  const nextRound = game.currentRound + 1;
+
+  await db.collection('games').doc(gameId).update({
+    currentRound: nextRound,
+    currentRoundAnswers: [],
+    roundPhase: 'ANSWERING',
+    updatedAt: new Date(),
+  });
+
+  return { message: 'Round advanced', currentRound: nextRound };
 }
