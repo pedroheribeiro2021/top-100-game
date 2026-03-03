@@ -5,9 +5,12 @@ import { useParams } from "next/navigation";
 import { getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
 import { Game, Player } from "@/types/game";
 import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
+import { onSnapshot, doc } from "firebase/firestore";
+import { db } from "@/services/firebase";
 
 export default function GamePage() {
-  const { code } = useParams();
+  const params = useParams<{ code: string }>();
+  const code = params.code;
   const [game, setGame] = useState<Game | null>(null);
   const [playerName, setPlayerName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,11 +23,17 @@ export default function GamePage() {
   }
 
   useEffect(() => {
+    if (!code) return;
+
     loadGame();
 
-    // polling simples a cada 3 segundos
-    const interval = setInterval(loadGame, 3000);
-    return () => clearInterval(interval);
+    const unsubscribe = onSnapshot(doc(db, "games", code), (snapshot) => {
+      if (snapshot.exists()) {
+        setGame(snapshot.data() as Game);
+      }
+    });
+
+    return () => unsubscribe();
   }, [code]);
 
   async function handleJoin() {
