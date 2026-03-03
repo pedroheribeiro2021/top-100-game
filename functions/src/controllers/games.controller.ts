@@ -6,6 +6,7 @@ import {
   joinGame,
   startGame,
   submitAnswer,
+  advanceRound,
 } from '../services/games.service';
 
 export async function createGameHandler(req: Request, res: Response) {
@@ -99,5 +100,32 @@ export async function submitAnswerHandler(req: Request, res: Response) {
     return res.status(200).json(result);
   } catch (error: any) {
     return res.status(400).json({ error: error.message });
+  }
+}
+
+/**
+ * 🔥 NOVO ENDPOINT: ADVANCE ROUND
+ */
+export async function advanceRoundHandler(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+
+    const result = await advanceRound(id);
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    if (error.message === 'GAME_NOT_FOUND') {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    if (error.message === 'INVALID_GAME_STATE') {
+      return res.status(400).json({ error: 'Invalid game state' });
+    }
+
+    if (error.message === 'ROUND_NOT_READY') {
+      return res.status(400).json({ error: 'Round not ready to advance' });
+    }
+
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
