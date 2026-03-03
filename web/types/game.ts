@@ -9,11 +9,15 @@ export type RankingItem = {
   value: string;
 };
 
-export type GameStatus =
-  | "WAITING_PLAYERS"
-  | "RANKING_READY"
-  | "STARTED"
-  | "FINISHED";
+export type RoundPhase = "ANSWERING" | "RESULT" | null;
+
+export type GameStatus = "RANKING_READY" | "STARTED" | "FINISHED";
+
+export type RoundAnswer = {
+  playerId: string;
+  answer: string;
+  points: number;
+};
 
 export type Game = {
   id: string;
@@ -22,7 +26,8 @@ export type Game = {
   currentRound: number;
   players: Player[];
   ranking: RankingItem[];
-  currentRoundAnswers: unknown[];
+  currentRoundAnswers: RoundAnswer[];
   status: GameStatus;
-  winner?: Player;
+  roundPhase: RoundPhase;
+  winner?: Player | null;
 };
