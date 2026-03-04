@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
+import { advanceRound, getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
 import { Game, Player } from "@/types/game";
 import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
 import { onSnapshot, doc } from "firebase/firestore";
@@ -142,21 +142,17 @@ function RoundSection({
 }) {
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const playerId =
+    typeof window !== "undefined" ? localStorage.getItem("playerId") : null;
 
   async function handleSubmit() {
     if (!answer) return alert("Digite uma resposta");
-
-    const playerId = localStorage.getItem("playerId");
-
-    if (!playerId) {
-      return alert("Você precisa entrar na sala primeiro");
-    }
+    if (!playerId) return alert("Você precisa entrar na sala primeiro");
 
     try {
       setSubmitting(true);
       await submitAnswer(game.id, playerId, answer);
       setAnswer("");
-      await reload();
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -164,27 +160,65 @@ function RoundSection({
     }
   }
 
+  async function handleAdvance() {
+    try {
+      await advanceRound(game.id); // ✅ AGORA USA A FUNÇÃO CORRETA
+      await reload();
+    } catch (error) {
+      alert("Erro ao avançar rodada");
+    }
+  }
+
   return (
     <div className="mt-6 space-y-4">
       <h2 className="font-bold">Rodada {game.currentRound}</h2>
 
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Sua resposta"
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          className="p-2 rounded bg-gray-800"
-        />
+      {game.roundPhase === "ANSWERING" && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Sua resposta"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            className="p-2 rounded bg-gray-800"
+          />
 
-        <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="bg-blue-600 px-4 rounded"
-        >
-          Enviar
-        </button>
-      </div>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="bg-blue-600 px-4 rounded"
+          >
+            Enviar
+          </button>
+        </div>
+      )}
+
+      {game.roundPhase === "RESULT" && (
+        <div className="space-y-3">
+          <h3 className="text-yellow-400 font-bold">Resultado da Rodada</h3>
+
+          <ul>
+            {game.currentRoundAnswers?.map((a) => {
+              const player = game.players.find((p) => p.id === a.playerId);
+
+              return (
+                <li key={a.playerId}>
+                  {player?.name}: {a.answer} (+{a.points} pts)
+                </li>
+              );
+            })}
+          </ul>
+
+          {game.status !== "FINISHED" && (
+            <button
+              onClick={handleAdvance}
+              className="bg-green-600 px-4 py-2 rounded"
+            >
+              Próxima Rodada
+            </button>
+          )}
+        </div>
+      )}
 
       <div>
         <h3 className="font-bold">Placar:</h3>

@@ -72,3 +72,13 @@ export async function submitAnswer(
   }
   return response.json();
 }
+
+export async function advanceRound(gameId: string) {
+  const response = await fetch(`${API_URL}/games/${gameId}/advance`, {
+    method: "POST",
+  });
+
+  if (!response.ok) throw new Error("Failed to advance round");
+
+  return response.json();
+}
