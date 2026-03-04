@@ -2,7 +2,7 @@
 import { db } from '../config/firestore';
 import { randomUUID } from 'crypto';
 import { generateGameCode } from '../utils/generateGameCode';
-import { generateRanking } from './generateRanking';
+import { generateRanking } from './gemini.service';
 
 const MAX_ROUNDS = 5;
 
