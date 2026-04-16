@@ -14,3 +14,15 @@ cp web/.env.example web/.env.local
 - Variáveis `NEXT_PUBLIC_*` em `web/.env.local`
 
 > Observação: o Firebase Emulator busca variáveis no escopo de `functions/.env` para Functions locais.
+
+## CI/CD (GitHub Actions)
+
+O workflow de CI está em `.github/workflows/ci.yml` e roda automaticamente em `push` e `pull_request` para as branches `develop` e `main`.
+
+### Jobs
+- `quality (functions)`
+- `quality (web)`
+- `status-checks` (agregador final para branch protection)
+
+Para configurar status checks obrigatórios no GitHub, marque pelo menos:
+- `status-checks`
