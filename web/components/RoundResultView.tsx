@@ -1,11 +1,22 @@
+import { Player } from "@/types/game";
+
+type PlayerWithRoundInfo = Player & {
+  lastAnswer?: string;
+  lastPosition?: number;
+  lastPoints?: number;
+};
+
 type Props = {
-  game: any;
+  game: {
+    currentRound: number;
+    players: PlayerWithRoundInfo[];
+  };
 };
 
 export default function RoundResultView({ game }: Props) {
-  const currentPlayer = game.players.find(
-    (p: any) => p.id === localStorage.getItem("playerId"),
-  );
+  const currentPlayerId =
+    typeof window !== "undefined" ? localStorage.getItem("playerId") : null;
+  const currentPlayer = game.players.find((p) => p.id === currentPlayerId);
 
   return (
     <div>
@@ -18,8 +29,11 @@ export default function RoundResultView({ game }: Props) {
       <h3>Ranking Parcial</h3>
       <ul>
         {game.players
-          .sort((a: any, b: any) => b.score - a.score)
-          .map((p: any) => (
+          .sort(
+            (a: PlayerWithRoundInfo, b: PlayerWithRoundInfo) =>
+              b.score - a.score,
+          )
+          .map((p: PlayerWithRoundInfo) => (
             <li key={p.id}>
               {p.name} - {p.score} pts
             </li>

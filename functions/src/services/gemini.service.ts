@@ -17,7 +17,7 @@ Regras:
 - Exatamente 100 itens
 - Ordenados do mais popular/importante para o menos
 - Apenas lista numerada
-- Sem explicaÃ§Ãµes
+- Sem explicações
 `;
 
   //   const result = await model.generateContent(prompt);
@@ -33,7 +33,7 @@ Regras:
 
   const lines = text
     .split('\n')
-    .map((line) => line.replace(/^\d+[\\.\-\\)]\s*/, '').trim())
+    .map((line: string) => line.replace(/^\d+[\\.\-\\)]\s*/, '').trim())
     .filter(Boolean);
 
   if (lines.length < 5) {
@@ -41,7 +41,7 @@ Regras:
   }
 
   // Converte para seu formato atual
-  return lines.slice(0, 100).map((value, index) => ({
+  return lines.slice(0, 100).map((value: string, index: number) => ({
     position: index + 1,
     value,
   }));
