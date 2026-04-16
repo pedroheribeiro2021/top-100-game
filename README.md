@@ -1,4 +1,4 @@
-# top-100-game
+# TOP 100 GAME
 
 ## Configuração de ambiente
 
