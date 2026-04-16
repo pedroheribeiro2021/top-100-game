@@ -12,7 +12,7 @@ export default function Home() {
       setLoading(true);
       const game = await createGame(theme);
       window.location.href = `/game/${game.id}`;
-    } catch (error) {
+    } catch {
       alert("Erro ao criar jogo");
     } finally {
       setLoading(false);

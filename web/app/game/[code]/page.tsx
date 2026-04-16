@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { advanceRound, getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
+import {
+  advanceRound,
+  getGameById,
+  joinGame,
+  startGame,
+  submitAnswer,
+} from "@/services/api";
 import { Game, Player } from "@/types/game";
 import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
 import { onSnapshot, doc } from "firebase/firestore";
@@ -17,10 +23,10 @@ export default function GamePage() {
 
   const currentPlayer = useCurrentPlayer(game);
 
-  async function loadGame() {
+  const loadGame = useCallback(async () => {
     const data = await getGameById(code as string);
     setGame(data);
-  }
+  }, [code]);
 
   useEffect(() => {
     if (!code) return;
@@ -34,7 +40,7 @@ export default function GamePage() {
     });
 
     return () => unsubscribe();
-  }, [code]);
+  }, [code, loadGame]);
 
   async function handleJoin() {
     if (!playerName) return alert("Digite seu nome");
@@ -45,7 +51,7 @@ export default function GamePage() {
       localStorage.setItem("playerId", player.id);
       setPlayerName("");
       await loadGame();
-    } catch (error) {
+    } catch {
       alert("Erro ao entrar na sala");
     } finally {
       setLoading(false);
@@ -56,7 +62,7 @@ export default function GamePage() {
     try {
       await startGame(game!.id);
       await loadGame();
-    } catch (error) {
+    } catch {
       alert("Erro ao iniciar jogo");
     }
   }
@@ -153,8 +159,12 @@ function RoundSection({
       setSubmitting(true);
       await submitAnswer(game.id, playerId, answer);
       setAnswer("");
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("Erro ao enviar resposta");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -164,7 +174,7 @@ function RoundSection({
     try {
       await advanceRound(game.id); // ✅ AGORA USA A FUNÇÃO CORRETA
       await reload();
-    } catch (error) {
+    } catch {
       alert("Erro ao avançar rodada");
     }
   }
