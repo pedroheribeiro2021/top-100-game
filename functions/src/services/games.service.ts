@@ -5,6 +5,42 @@ import { generateGameCode } from '../utils/generateGameCode';
 import { generateRanking } from './gemini.service';
 
 const MAX_ROUNDS = 5;
+const ROUND_TIME_LIMIT_SECONDS = 180;
+
+type RoundAnswer = {
+  playerId: string;
+  answer: string;
+  points: number;
+};
+
+function getNextRoundDeadline() {
+  return new Date(Date.now() + ROUND_TIME_LIMIT_SECONDS * 1000);
+}
+
+function scorePlayers(players: any[], roundAnswers: RoundAnswer[]) {
+  return players.map((player: any) => {
+    const playerAnswer = roundAnswers.find((a: any) => a.playerId === player.id);
+
+    return {
+      ...player,
+      score: player.score + (playerAnswer?.points || 0),
+    };
+  });
+}
+
+function buildRoundHistoryEntry(
+  round: number,
+  roundAnswers: RoundAnswer[],
+  players: any[],
+) {
+  const ranking = [...players].sort((a, b) => b.score - a.score);
+
+  return {
+    round,
+    answers: roundAnswers,
+    ranking,
+  };
+}
 
 export async function createGame(theme: string) {
   const id = randomUUID();
@@ -20,6 +56,8 @@ export async function createGame(theme: string) {
     ranking,
     currentRound: 0,
     currentRoundAnswers: [],
+    roundHistory: [],
+    roundDeadlineAt: null,
     winner: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -99,17 +137,22 @@ export async function startGame(gameId: string) {
     throw new Error('NO_PLAYERS');
   }
 
+  const roundDeadlineAt = getNextRoundDeadline();
+
   await db.collection('games').doc(gameId).update({
     status: 'STARTED',
     roundPhase: 'ANSWERING',
     currentRound: 1,
     currentRoundAnswers: [],
+    roundHistory: [],
+    roundDeadlineAt,
     updatedAt: new Date(),
   });
 
   return {
     message: 'Game started',
     currentRound: 1,
+    roundDeadlineAt,
   };
 }
 
@@ -153,41 +196,47 @@ export async function submitAnswer(
   const updatedAnswers = [...(game.currentRoundAnswers || []), newAnswer];
 
   let updatedPlayers = game.players;
-  let newRoundPhase = 'ANSWERING';
   let newStatus = game.status;
   let winner = game.winner || null;
+  let nextRound = game.currentRound;
+  let nextRoundPhase = 'ANSWERING';
+  let nextRoundAnswers = updatedAnswers;
+  let nextRoundDeadline = game.roundDeadlineAt || null;
+  const roundHistory = [...(game.roundHistory || [])];
 
-  // 🔥 Se todos responderam → muda para RESULT
   if (updatedAnswers.length === game.players.length) {
-    updatedPlayers = game.players.map((player: any) => {
-      const playerAnswer = updatedAnswers.find(
-        (a: any) => a.playerId === player.id,
-      );
+    updatedPlayers = scorePlayers(game.players, updatedAnswers);
 
-      return {
-        ...player,
-        score: player.score + (playerAnswer?.points || 0),
-      };
-    });
+    roundHistory.push(
+      buildRoundHistoryEntry(game.currentRound, updatedAnswers, updatedPlayers),
+    );
 
-    newRoundPhase = 'RESULT';
-
-    // Se for última rodada, finaliza
+    // Última rodada -> encerra jogo
     if (game.currentRound >= MAX_ROUNDS) {
       newStatus = 'FINISHED';
 
-      const sortedPlayers = [...updatedPlayers].sort(
-        (a, b) => b.score - a.score,
-      );
-
+      const sortedPlayers = [...updatedPlayers].sort((a, b) => b.score - a.score);
       winner = sortedPlayers[0];
+
+      nextRoundPhase = 'RESULT';
+      nextRoundAnswers = updatedAnswers;
+      nextRoundDeadline = null;
+    } else {
+      // Avanço automático para próxima rodada
+      nextRound = game.currentRound + 1;
+      nextRoundPhase = 'ANSWERING';
+      nextRoundAnswers = [];
+      nextRoundDeadline = getNextRoundDeadline();
     }
   }
 
   await db.collection('games').doc(gameId).update({
     players: updatedPlayers,
-    currentRoundAnswers: updatedAnswers,
-    roundPhase: newRoundPhase,
+    currentRound: nextRound,
+    currentRoundAnswers: nextRoundAnswers,
+    roundPhase: nextRoundPhase,
+    roundHistory,
+    roundDeadlineAt: nextRoundDeadline,
     status: newStatus,
     winner,
     updatedAt: new Date(),
@@ -197,7 +246,7 @@ export async function submitAnswer(
 }
 
 /**
- * Avança rodada manualmente (chamar após exibir RESULT no frontend)
+ * Avança rodada manualmente (fallback para cenários de timeout/uso administrativo)
  */
 export async function advanceRound(gameId: string) {
   const doc = await db.collection('games').doc(gameId).get();
@@ -207,14 +256,44 @@ export async function advanceRound(gameId: string) {
   if (!game) throw new Error('GAME_NOT_FOUND');
 
   if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
-  if (game.roundPhase !== 'RESULT') throw new Error('ROUND_NOT_READY');
+
+  const scoredPlayers = scorePlayers(game.players, game.currentRoundAnswers || []);
+  const roundHistory = [...(game.roundHistory || [])];
+
+  roundHistory.push(
+    buildRoundHistoryEntry(
+      game.currentRound,
+      game.currentRoundAnswers || [],
+      scoredPlayers,
+    ),
+  );
+
+  if (game.currentRound >= MAX_ROUNDS) {
+    const sortedPlayers = [...scoredPlayers].sort((a, b) => b.score - a.score);
+
+    await db.collection('games').doc(gameId).update({
+      players: scoredPlayers,
+      currentRoundAnswers: game.currentRoundAnswers || [],
+      roundPhase: 'RESULT',
+      roundHistory,
+      roundDeadlineAt: null,
+      status: 'FINISHED',
+      winner: sortedPlayers[0],
+      updatedAt: new Date(),
+    });
+
+    return { message: 'Game finished', currentRound: game.currentRound };
+  }
 
   const nextRound = game.currentRound + 1;
 
   await db.collection('games').doc(gameId).update({
+    players: scoredPlayers,
     currentRound: nextRound,
     currentRoundAnswers: [],
     roundPhase: 'ANSWERING',
+    roundHistory,
+    roundDeadlineAt: getNextRoundDeadline(),
     updatedAt: new Date(),
   });
 

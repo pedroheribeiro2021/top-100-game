@@ -35,10 +35,44 @@ function loadLocalEnvFile() {
   }
 }
 
+function configureCors(app: express.Express) {
+  const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  app.use((req, res, next) => {
+    const requestOrigin = req.headers.origin;
+
+    if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+      if (requestOrigin) {
+        res.header('Access-Control-Allow-Origin', requestOrigin);
+      }
+
+      res.header('Vary', 'Origin');
+      res.header(
+        'Access-Control-Allow-Methods',
+        'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+      );
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.header('Access-Control-Allow-Credentials', 'true');
+
+      if (req.method === 'OPTIONS') {
+        return res.status(204).send('');
+      }
+
+      return next();
+    }
+
+    return res.status(403).json({ error: 'Origin not allowed by CORS policy' });
+  });
+}
+
 loadLocalEnvFile();
 
 const app = express();
 
+configureCors(app);
 app.use(express.json());
 
 app.use('/games', gamesRoutes);
