@@ -19,6 +19,12 @@ export type RoundAnswer = {
   points: number;
 };
 
+export type RoundHistoryEntry = {
+  round: number;
+  answers: RoundAnswer[];
+  ranking: Player[];
+};
+
 export type Game = {
   id: string;
   theme: string;
@@ -27,6 +33,8 @@ export type Game = {
   players: Player[];
   ranking: RankingItem[];
   currentRoundAnswers: RoundAnswer[];
+  roundHistory?: RoundHistoryEntry[];
+  roundDeadlineAt?: string | null;
   status: GameStatus;
   roundPhase: RoundPhase;
   winner?: Player | null;
