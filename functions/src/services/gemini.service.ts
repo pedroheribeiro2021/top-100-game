@@ -5,7 +5,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function generateRanking(theme: string) {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-flash-preview',
+    // model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash-lite',
   });
 
   const prompt = `
@@ -17,7 +18,7 @@ Regras:
 - Exatamente 100 itens
 - Ordenados do mais popular/importante para o menos
 - Apenas lista numerada
-- Sem explicações
+- Sem explicaï¿½ï¿½es
 `;
 
   //   const result = await model.generateContent(prompt);
