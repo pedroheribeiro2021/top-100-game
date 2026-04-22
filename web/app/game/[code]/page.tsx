@@ -19,10 +19,10 @@ export default function GamePage() {
 
   const currentPlayer = useCurrentPlayer(game);
 
-  const loadGame = useCallback(async () => {
+  async function loadGame() {
     const data = await getGameById(code as string);
     setGame(data);
-  }, [code]);
+  }
 
   useEffect(() => {
     if (!code) return;
@@ -36,7 +36,7 @@ export default function GamePage() {
     });
 
     return () => unsubscribe();
-  }, [code, loadGame]);
+  }, [code]);
 
   async function handleJoin() {
     if (!playerName) return alert("Digite seu nome");

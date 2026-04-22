@@ -84,10 +84,10 @@ app.use('/games', gamesRoutes)
 app.use('/api/games', gamesRoutes)
 
 app.get('/health', (_, res) => {
-  res.json({ status: 'ok' })
-})
+  res.json({ status: 'ok' });
+});
 
-export const api = functions.https.onRequest(app)
+export const api = functions.https.onRequest(app);
 
 if (process.env.PORT) {
   const port = Number(process.env.PORT)

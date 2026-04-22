@@ -20,6 +20,11 @@ function buildFallbackRanking(theme: string) {
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
+export async function generateRanking(theme: string) {
+  const model = genAI.getGenerativeModel({
+    // model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash-lite',
+  });
 
 export async function generateRanking(theme: string) {
   const prompt = `
