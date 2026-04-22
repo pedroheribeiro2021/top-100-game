@@ -1,4 +1,4 @@
-# TOP 100 GAME
+# top-100-game
 
 ## Configuração de ambiente
 
@@ -27,3 +27,12 @@ O workflow de CI está em `.github/workflows/ci.yml` e roda automaticamente em `
 
 Para configurar status checks obrigatórios no GitHub, marque pelo menos:
 - `status-checks`
+
+
+## Endpoints locais do backend
+
+Quando rodando localmente você pode usar qualquer um dos formatos abaixo:
+- `http://localhost:5001/api/games`
+- `http://localhost:5001/games`
+
+No frontend em produção (Vercel), configure `NEXT_PUBLIC_API_URL` para a URL do Render (por exemplo `https://top-100-game-staging.onrender.com`).

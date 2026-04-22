@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { advanceRound, getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
 import { Game, Player, RoundHistoryEntry } from "@/types/game";
