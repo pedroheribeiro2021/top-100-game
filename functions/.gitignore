@@ -13,3 +13,7 @@ node_modules/
 firebase-debug.log
 .firebaserc
 .firebase/
+
+.env
+
+service-account.json

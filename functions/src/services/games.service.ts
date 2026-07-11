@@ -2,21 +2,158 @@
 import { db } from '../config/firestore';
 import { randomUUID } from 'crypto';
 import { generateGameCode } from '../utils/generateGameCode';
-import { generateRanking } from './generateRanking';
+import { generateRanking } from './ranking.service';
+import { normalize, findRankingItem } from './matching';
+import {
+  ThemeBank,
+  ThemeSummary,
+  getRandomTheme,
+  getThemeById,
+  resolveThemeByQuery,
+} from './themes.service';
 
-export async function createGame(theme: string) {
+const MAX_ROUNDS = 5;
+const ROUND_TIME_LIMIT_SECONDS = 180;
+const ENABLE_AI_FALLBACK = process.env.ENABLE_AI_FALLBACK === 'true';
+
+export class ThemeNotFoundError extends Error {
+  constructor(readonly suggestions: ThemeSummary[]) {
+    super('THEME_NOT_FOUND');
+  }
+}
+
+type CreateGameInput = {
+  theme?: string;
+  themeId?: string;
+  random?: boolean;
+};
+
+type ResolvedGameTheme = {
+  title: string;
+  themeId: string | null;
+  ranking: { position: number; value: string; aliases?: string[] }[];
+  source: 'bank' | 'groq' | 'openrouter';
+  warning: string | null;
+};
+
+function toRankingItems(theme: ThemeBank) {
+  return theme.items.map((item) => ({
+    position: item.position,
+    value: item.value,
+    aliases: item.aliases,
+  }));
+}
+
+async function resolveGameTheme(input: CreateGameInput): Promise<ResolvedGameTheme> {
+  if (input.random) {
+    const theme = getRandomTheme();
+    return {
+      title: theme.title,
+      themeId: theme.id,
+      ranking: toRankingItems(theme),
+      source: 'bank',
+      warning: null,
+    };
+  }
+
+  if (input.themeId) {
+    const theme = getThemeById(input.themeId);
+    if (!theme) throw new Error('THEME_ID_NOT_FOUND');
+
+    return {
+      title: theme.title,
+      themeId: theme.id,
+      ranking: toRankingItems(theme),
+      source: 'bank',
+      warning: null,
+    };
+  }
+
+  const query = input.theme;
+  if (!query) throw new Error('THEME_REQUIRED');
+
+  const match = resolveThemeByQuery(query);
+  if (match.matched) {
+    return {
+      title: match.theme.title,
+      themeId: match.theme.id,
+      ranking: toRankingItems(match.theme),
+      source: 'bank',
+      warning: null,
+    };
+  }
+
+  if (ENABLE_AI_FALLBACK) {
+    const aiResult = await generateRanking(query);
+    return {
+      title: query,
+      themeId: null,
+      ranking: aiResult.ranking,
+      source: aiResult.source,
+      warning: aiResult.warning,
+    };
+  }
+
+  throw new ThemeNotFoundError(match.suggestions);
+}
+
+type RoundAnswer = {
+  playerId: string;
+  answer: string;
+  points: number;
+  alreadyUsed: boolean;
+};
+
+function getNextRoundDeadline() {
+  return new Date(Date.now() + ROUND_TIME_LIMIT_SECONDS * 1000);
+}
+
+function scorePlayers(players: any[], roundAnswers: RoundAnswer[]) {
+  return players.map((player: any) => {
+    const playerAnswer = roundAnswers.find((a: any) => a.playerId === player.id);
+
+    return {
+      ...player,
+      score: player.score + (playerAnswer?.points || 0),
+    };
+  });
+}
+
+function buildRoundHistoryEntry(
+  round: number,
+  roundAnswers: RoundAnswer[],
+  players: any[],
+) {
+  const ranking = [...players].sort((a, b) => b.score - a.score);
+
+  return {
+    round,
+    answers: roundAnswers,
+    ranking,
+  };
+}
+
+export async function createGame(input: CreateGameInput) {
   const id = randomUUID();
   const gameCode = generateGameCode();
-
-  const ranking = await generateRanking(theme);
+  const resolvedTheme = await resolveGameTheme(input);
 
   const game = {
     id,
-    theme,
+    theme: resolvedTheme.title,
+    themeId: resolvedTheme.themeId,
     status: 'RANKING_READY',
+    roundPhase: null,
     players: [],
-    ranking,
+    ranking: resolvedTheme.ranking,
+    rankingSource: resolvedTheme.source,
+    rankingWarning: resolvedTheme.warning,
     currentRound: 0,
+    currentRoundAnswers: [],
+    usedItems: [],
+    roundHistory: [],
+    roundDeadlineAt: null,
+    winner: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     gameCode,
@@ -29,9 +166,7 @@ export async function createGame(theme: string) {
 
 export async function getGameById(id: string) {
   const doc = await db.collection('games').doc(id).get();
-
   if (!doc.exists) return null;
-
   return doc.data();
 }
 
@@ -84,15 +219,10 @@ export async function joinGame(gameCode: string, playerName: string) {
 export async function startGame(gameId: string) {
   const doc = await db.collection('games').doc(gameId).get();
 
-  if (!doc.exists) {
-    throw new Error('GAME_NOT_FOUND');
-  }
+  if (!doc.exists) throw new Error('GAME_NOT_FOUND');
 
   const game = doc.data();
-
-  if (!game) {
-    throw new Error('GAME_NOT_FOUND');
-  }
+  if (!game) throw new Error('GAME_NOT_FOUND');
 
   if (game.status !== 'RANKING_READY') {
     throw new Error('INVALID_GAME_STATE');
@@ -102,16 +232,23 @@ export async function startGame(gameId: string) {
     throw new Error('NO_PLAYERS');
   }
 
+  const roundDeadlineAt = getNextRoundDeadline();
+
   await db.collection('games').doc(gameId).update({
     status: 'STARTED',
+    roundPhase: 'ANSWERING',
     currentRound: 1,
     currentRoundAnswers: [],
+    usedItems: [],
+    roundHistory: [],
+    roundDeadlineAt,
     updatedAt: new Date(),
   });
 
   return {
     message: 'Game started',
     currentRound: 1,
+    roundDeadlineAt,
   };
 }
 
@@ -121,19 +258,17 @@ export async function submitAnswer(
   answer: string,
 ) {
   const doc = await db.collection('games').doc(gameId).get();
-
   if (!doc.exists) throw new Error('GAME_NOT_FOUND');
 
   const game = doc.data();
-
   if (!game) throw new Error('GAME_NOT_FOUND');
 
   if (game.status === 'FINISHED') throw new Error('GAME_FINISHED');
-
   if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
+  if (game.roundPhase !== 'ANSWERING')
+    throw new Error('ROUND_NOT_ACCEPTING_ANSWERS');
 
   const player = game.players.find((p: any) => p.id === playerId);
-
   if (!player) throw new Error('PLAYER_NOT_FOUND');
 
   const alreadyAnswered = (game.currentRoundAnswers || []).some(
@@ -142,66 +277,126 @@ export async function submitAnswer(
 
   if (alreadyAnswered) throw new Error('ALREADY_ANSWERED');
 
-  const rankingItem = game.ranking.find(
-    (item: any) => item.value.toLowerCase() === answer.toLowerCase(),
-  );
-
-  const points = rankingItem ? rankingItem.position : 0;
+  const rankingItem = findRankingItem(game.ranking, answer);
+  const usedItems: string[] = game.usedItems || [];
+  const normalizedValue = rankingItem ? normalize(rankingItem.value) : null;
+  const alreadyUsed = normalizedValue !== null && usedItems.includes(normalizedValue);
+  const points = rankingItem && !alreadyUsed ? rankingItem.position : 0;
 
   const newAnswer = {
     playerId,
     answer,
     points,
+    alreadyUsed,
   };
+
+  const updatedUsedItems =
+    normalizedValue && !alreadyUsed ? [...usedItems, normalizedValue] : usedItems;
 
   const updatedAnswers = [...(game.currentRoundAnswers || []), newAnswer];
 
   let updatedPlayers = game.players;
-  let nextRound = game.currentRound;
   let newStatus = game.status;
-  const maxRounds = 5;
+  let winner = game.winner || null;
+  let nextRound = game.currentRound;
+  let nextRoundPhase = 'ANSWERING';
+  let nextRoundAnswers = updatedAnswers;
+  let nextRoundDeadline = game.roundDeadlineAt || null;
+  const roundHistory = [...(game.roundHistory || [])];
 
-  // 🔥 Se todos responderam
   if (updatedAnswers.length === game.players.length) {
-    // somar pontos
-    updatedPlayers = game.players.map((player: any) => {
-      const playerAnswer = updatedAnswers.find(
-        (a: any) => a.playerId === player.id,
-      );
+    updatedPlayers = scorePlayers(game.players, updatedAnswers);
 
-      return {
-        ...player,
-        score: player.score + (playerAnswer?.points || 0),
-      };
-    });
+    roundHistory.push(
+      buildRoundHistoryEntry(game.currentRound, updatedAnswers, updatedPlayers),
+    );
 
-    nextRound = game.currentRound + 1;
-
-    if (nextRound > maxRounds) {
+    // Última rodada -> encerra jogo
+    if (game.currentRound >= MAX_ROUNDS) {
       newStatus = 'FINISHED';
+
+      const sortedPlayers = [...updatedPlayers].sort((a, b) => b.score - a.score);
+      winner = sortedPlayers[0];
+
+      nextRoundPhase = 'RESULT';
+      nextRoundAnswers = updatedAnswers;
+      nextRoundDeadline = null;
+    } else {
+      // Avanço automático para próxima rodada
+      nextRound = game.currentRound + 1;
+      nextRoundPhase = 'ANSWERING';
+      nextRoundAnswers = [];
+      nextRoundDeadline = getNextRoundDeadline();
     }
   }
 
-  let winner = null;
+  await db.collection('games').doc(gameId).update({
+    players: updatedPlayers,
+    currentRound: nextRound,
+    currentRoundAnswers: nextRoundAnswers,
+    usedItems: updatedUsedItems,
+    roundPhase: nextRoundPhase,
+    roundHistory,
+    roundDeadlineAt: nextRoundDeadline,
+    status: newStatus,
+    winner,
+    updatedAt: new Date(),
+  });
 
-  if (newStatus === 'FINISHED') {
-    const sortedPlayers = [...updatedPlayers].sort((a, b) => b.score - a.score);
+  return newAnswer;
+}
 
-    winner = sortedPlayers[0];
-  }
+/**
+ * Avança rodada manualmente (fallback para cenários de timeout/uso administrativo)
+ */
+export async function advanceRound(gameId: string) {
+  const doc = await db.collection('games').doc(gameId).get();
+  if (!doc.exists) throw new Error('GAME_NOT_FOUND');
 
-  await db
-    .collection('games')
-    .doc(gameId)
-    .update({
-      players: updatedPlayers,
-      currentRoundAnswers:
-        updatedAnswers.length === game.players.length ? [] : updatedAnswers,
-      currentRound: nextRound,
-      status: newStatus,
-      winner: winner || null,
+  const game = doc.data();
+  if (!game) throw new Error('GAME_NOT_FOUND');
+
+  if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
+
+  const scoredPlayers = scorePlayers(game.players, game.currentRoundAnswers || []);
+  const roundHistory = [...(game.roundHistory || [])];
+
+  roundHistory.push(
+    buildRoundHistoryEntry(
+      game.currentRound,
+      game.currentRoundAnswers || [],
+      scoredPlayers,
+    ),
+  );
+
+  if (game.currentRound >= MAX_ROUNDS) {
+    const sortedPlayers = [...scoredPlayers].sort((a, b) => b.score - a.score);
+
+    await db.collection('games').doc(gameId).update({
+      players: scoredPlayers,
+      currentRoundAnswers: game.currentRoundAnswers || [],
+      roundPhase: 'RESULT',
+      roundHistory,
+      roundDeadlineAt: null,
+      status: 'FINISHED',
+      winner: sortedPlayers[0],
       updatedAt: new Date(),
     });
 
-  return newAnswer;
+    return { message: 'Game finished', currentRound: game.currentRound };
+  }
+
+  const nextRound = game.currentRound + 1;
+
+  await db.collection('games').doc(gameId).update({
+    players: scoredPlayers,
+    currentRound: nextRound,
+    currentRoundAnswers: [],
+    roundPhase: 'ANSWERING',
+    roundHistory,
+    roundDeadlineAt: getNextRoundDeadline(),
+    updatedAt: new Date(),
+  });
+
+  return { message: 'Round advanced', currentRound: nextRound };
 }
