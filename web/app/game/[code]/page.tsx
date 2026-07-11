@@ -1,14 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { advanceRound, getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
+import {
+  advanceRound,
+  getGameById,
+  joinGame,
+  startGame,
+  submitAnswer,
+} from "@/services/api";
 import { Game, Player, RoundHistoryEntry } from "@/types/game";
 import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
-import { onSnapshot, doc } from "firebase/firestore";
-import { db } from "@/services/firebase";
 
 const ROUND_TIME_LIMIT_SECONDS = 180;
+const GAME_POLL_INTERVAL_MS = 2000;
 
 export default function GamePage() {
   const params = useParams<{ code: string }>();
@@ -19,31 +24,32 @@ export default function GamePage() {
 
   const currentPlayer = useCurrentPlayer(game);
 
-  async function loadGame() {
+  const loadGame = useCallback(async () => {
+    if (!code) return;
+
     const data = await getGameById(code as string);
     setGame(data);
-  }
+  }, [code]);
 
   useEffect(() => {
     if (!code) return;
 
-    loadGame();
+    void loadGame();
 
-    const unsubscribe = onSnapshot(doc(db, "games", code), (snapshot) => {
-      if (snapshot.exists()) {
-        setGame(snapshot.data() as Game);
-      }
-    });
+    const interval = setInterval(() => {
+      void loadGame();
+    }, GAME_POLL_INTERVAL_MS);
 
-    return () => unsubscribe();
-  }, [code]);
+    return () => clearInterval(interval);
+  }, [code, loadGame]);
 
   async function handleJoin() {
     if (!playerName) return alert("Digite seu nome");
+    if (!game) return;
 
     try {
       setLoading(true);
-      const player = await joinGame(game!.gameCode, playerName);
+      const player = await joinGame(game.gameCode, playerName);
       localStorage.setItem("playerId", player.id);
       setPlayerName("");
       await loadGame();
@@ -55,8 +61,10 @@ export default function GamePage() {
   }
 
   async function handleStart() {
+    if (!game) return;
+
     try {
-      await startGame(game!.id);
+      await startGame(game.id);
       await loadGame();
     } catch {
       alert("Erro ao iniciar jogo");
@@ -66,12 +74,20 @@ export default function GamePage() {
   if (!game) return <div className="p-10">Carregando...</div>;
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-8">
-      <h1 className="text-2xl font-bold mb-4">{game.theme}</h1>
+    <main className="min-h-screen bg-gray-900 p-8 text-white">
+      <h1 className="mb-4 text-2xl font-bold">{game.theme}</h1>
 
-      <p>Código da sala: <span className="font-mono">{game.gameCode}</span></p>
+      <p>
+        Codigo da sala: <span className="font-mono">{game.gameCode}</span>
+      </p>
       <p>Status: {game.status}</p>
       <p>Rodada atual: {game.currentRound}</p>
+
+      {game.rankingSource && (
+        <div className="mt-4 rounded border border-blue-700 bg-blue-950/40 p-3 text-sm text-blue-200">
+          Tema gerado dinamicamente por IA via {game.rankingSource}.
+        </div>
+      )}
 
       {game.status === "RANKING_READY" && (
         <div className="mt-6 space-y-4">
@@ -81,13 +97,13 @@ export default function GamePage() {
               placeholder="Seu nome"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
-              className="p-2 rounded bg-gray-800"
+              className="rounded bg-gray-800 p-2"
             />
 
             <button
               onClick={handleJoin}
               disabled={loading}
-              className="bg-blue-600 px-4 rounded"
+              className="rounded bg-blue-600 px-4"
             >
               Entrar
             </button>
@@ -99,11 +115,11 @@ export default function GamePage() {
               {game.players.map((player: Player) => (
                 <li
                   key={player.id}
-                  className={`${
+                  className={
                     currentPlayer?.id === player.id
-                      ? "text-green-400 font-bold"
+                      ? "font-bold text-green-400"
                       : ""
-                  }`}
+                  }
                 >
                   {player.name} - {player.score} pts
                 </li>
@@ -114,21 +130,23 @@ export default function GamePage() {
           {game.players.length > 0 && (
             <button
               onClick={handleStart}
-              className="bg-green-600 px-4 py-2 rounded"
+              className="rounded bg-green-600 px-4 py-2"
             >
-              Iniciar Jogo
+              Iniciar jogo
             </button>
           )}
         </div>
       )}
 
       {game.status === "STARTED" && (
-        <RoundSection game={game} reload={loadGame} currentPlayer={currentPlayer} />
+        <RoundSection
+          game={game}
+          reload={loadGame}
+          currentPlayer={currentPlayer}
+        />
       )}
 
-      {game.status === "FINISHED" && (
-        <FinalResultSection game={game} />
-      )}
+      {game.status === "FINISHED" && <FinalResultSection game={game} />}
     </main>
   );
 }
@@ -150,7 +168,6 @@ function RoundSection({
   const playerId =
     typeof window !== "undefined" ? localStorage.getItem("playerId") : null;
 
-
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
@@ -160,21 +177,23 @@ function RoundSection({
   }, []);
 
   const secondsLeft = useMemo(() => {
-    if (!game.roundDeadlineAt) return ROUND_TIME_LIMIT_SECONDS;
-    const deadline = new Date(game.roundDeadlineAt).getTime();
+    const deadline = resolveDeadlineMs(game.roundDeadlineAt);
+    if (deadline === null) return null;
+
     const diff = Math.floor((deadline - now) / 1000);
     return Math.max(diff, 0);
   }, [game.roundDeadlineAt, now]);
 
   const alreadyAnswered = useMemo(() => {
     if (!playerId) return false;
+
     return (game.currentRoundAnswers || []).some((a) => a.playerId === playerId);
   }, [game.currentRoundAnswers, playerId]);
 
   useEffect(() => {
     if (game.status !== "STARTED") return;
     if (game.roundPhase !== "ANSWERING") return;
-    if (secondsLeft > 0) return;
+    if (secondsLeft === null || secondsLeft > 0) return;
     if (advancing) return;
 
     const timeoutAdvance = async () => {
@@ -183,18 +202,18 @@ function RoundSection({
         await advanceRound(game.id);
         await reload();
       } catch {
-        // outro cliente pode ter avançado a rodada antes
+        // Outro cliente pode ter avancado a rodada antes.
       } finally {
         setAdvancing(false);
       }
     };
 
-    timeoutAdvance();
+    void timeoutAdvance();
   }, [advancing, game.id, game.roundPhase, game.status, reload, secondsLeft]);
 
   async function handleSubmit() {
     if (!answer) return alert("Digite uma resposta");
-    if (!playerId) return alert("Você precisa entrar na sala primeiro");
+    if (!playerId) return alert("Voce precisa entrar na sala primeiro");
 
     try {
       setSubmitting(true);
@@ -217,9 +236,14 @@ function RoundSection({
     <div className="mt-6 space-y-4">
       <h2 className="font-bold">Rodada {game.currentRound}</h2>
 
-      <div className="p-3 rounded bg-gray-800">
+      <div className="rounded bg-gray-800 p-3">
         <p>
-          ⏱️ Tempo restante: <span className="font-bold">{formatSeconds(secondsLeft)}</span>
+          Tempo restante:{" "}
+          <span className="font-bold">
+            {secondsLeft === null
+              ? formatSeconds(ROUND_TIME_LIMIT_SECONDS)
+              : formatSeconds(secondsLeft)}
+          </span>
         </p>
         <p>
           Respostas recebidas: {playersAnswered}/{totalPlayers}
@@ -235,26 +259,27 @@ function RoundSection({
                 placeholder="Sua resposta"
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
-                className="p-2 rounded bg-gray-800"
+                className="rounded bg-gray-800 p-2"
               />
 
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="bg-blue-600 px-4 rounded"
+                className="rounded bg-blue-600 px-4"
               >
                 Enviar
               </button>
             </div>
           ) : (
-            <p className="text-green-400 font-semibold">
-              ✅ Resposta enviada! Aguardando demais jogadores...
+            <p className="font-semibold text-green-400">
+              Resposta enviada. Aguardando os demais jogadores...
             </p>
           )}
 
           {currentPlayer && (
             <p className="text-sm text-gray-300">
-              Jogando como: <span className="font-semibold">{currentPlayer.name}</span>
+              Jogando como:{" "}
+              <span className="font-semibold">{currentPlayer.name}</span>
             </p>
           )}
         </div>
@@ -288,8 +313,8 @@ function FinalResultSection({ game }: { game: Game }) {
 
   return (
     <div className="mt-6 space-y-6">
-      <div className="bg-green-900/40 border border-green-700 rounded p-4">
-        <h2 className="text-xl font-bold text-green-300">🏆 Resultado Final</h2>
+      <div className="rounded border border-green-700 bg-green-900/40 p-4">
+        <h2 className="text-xl font-bold text-green-300">Resultado final</h2>
         {winner ? (
           <p className="mt-2">
             Vencedor: <span className="font-bold">{winner.name}</span> com{" "}
@@ -301,8 +326,8 @@ function FinalResultSection({ game }: { game: Game }) {
       </div>
 
       <div>
-        <h3 className="font-bold mb-2">Ranking final</h3>
-        <ol className="list-decimal list-inside space-y-1">
+        <h3 className="mb-2 font-bold">Ranking final</h3>
+        <ol className="list-inside list-decimal space-y-1">
           {ranking.map((player) => (
             <li key={player.id}>
               {player.name} - {player.score} pts
@@ -312,15 +337,15 @@ function FinalResultSection({ game }: { game: Game }) {
       </div>
 
       <div>
-        <h3 className="font-bold mb-2">Respostas por rodada</h3>
+        <h3 className="mb-2 font-bold">Respostas por rodada</h3>
 
         {roundHistory.length === 0 ? (
-          <p className="text-gray-300">Sem histórico de rodadas registrado.</p>
+          <p className="text-gray-300">Sem historico de rodadas registrado.</p>
         ) : (
           <div className="space-y-4">
             {roundHistory.map((entry: RoundHistoryEntry) => (
-              <div key={entry.round} className="bg-gray-800 rounded p-3">
-                <h4 className="font-semibold text-yellow-300 mb-2">
+              <div key={entry.round} className="rounded bg-gray-800 p-3">
+                <h4 className="mb-2 font-semibold text-yellow-300">
                   Rodada {entry.round}
                 </h4>
                 <ul className="space-y-1">
@@ -341,7 +366,7 @@ function FinalResultSection({ game }: { game: Game }) {
 
       <button
         onClick={handleNewGame}
-        className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-500"
+        className="rounded bg-blue-600 px-4 py-2 hover:bg-blue-500"
       >
         Novo jogo
       </button>
@@ -355,4 +380,28 @@ function formatSeconds(totalSeconds: number) {
     .padStart(2, "0");
   const seconds = (totalSeconds % 60).toString().padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function resolveDeadlineMs(roundDeadlineAt: unknown) {
+  if (!roundDeadlineAt) return null;
+
+  if (typeof roundDeadlineAt === "string") {
+    const timestamp = new Date(roundDeadlineAt).getTime();
+    return Number.isFinite(timestamp) ? timestamp : null;
+  }
+
+  if (typeof roundDeadlineAt === "object") {
+    const maybeSeconds =
+      "seconds" in roundDeadlineAt
+        ? roundDeadlineAt.seconds
+        : "_seconds" in roundDeadlineAt
+          ? roundDeadlineAt._seconds
+          : null;
+
+    if (typeof maybeSeconds === "number") {
+      return maybeSeconds * 1000;
+    }
+  }
+
+  return null;
 }
