@@ -1,0 +1,12 @@
+[
+  { "id": "cidades-mais-populosas-mundo", "title": "Top 100 cidades mais populosas do mundo", "category": "geografia", "file": "cidades-mais-populosas-mundo.json" },
+  { "id": "cidades-mais-populosas-brasil", "title": "Top 100 cidades mais populosas do Brasil", "category": "geografia", "file": "cidades-mais-populosas-brasil.json" },
+  { "id": "paises-mais-populosos", "title": "Top 100 países mais populosos", "category": "geografia", "file": "paises-mais-populosos.json" },
+  { "id": "maiores-paises-area", "title": "Top 100 maiores países em área", "category": "geografia", "file": "maiores-paises-area.json" },
+  { "id": "filmes-maior-bilheteria", "title": "Top 100 filmes de maior bilheteria", "category": "cinema", "file": "filmes-maior-bilheteria.json" },
+  { "id": "artistas-mais-ouvidos", "title": "Top 100 artistas mais ouvidos no streaming", "category": "musica", "file": "artistas-mais-ouvidos.json" },
+  { "id": "jogadores-futebol-mais-famosos", "title": "Top 100 jogadores de futebol mais famosos de todos os tempos", "category": "esporte", "file": "jogadores-futebol-mais-famosos.json" },
+  { "id": "marcas-mais-valiosas", "title": "Top 100 marcas mais valiosas do mundo", "category": "negocios", "file": "marcas-mais-valiosas.json" },
+  { "id": "maiores-animais", "title": "Top 100 maiores animais do mundo", "category": "natureza", "file": "maiores-animais.json" },
+  { "id": "comidas-mais-amadas-brasil", "title": "Top 100 comidas mais amadas do Brasil", "category": "gastronomia", "file": "comidas-mais-amadas-brasil.json" }
+]

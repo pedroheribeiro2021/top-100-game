@@ -8,6 +8,7 @@ import {
   submitAnswer,
   advanceRound,
 } from '../services/games.service';
+import { RankingGenerationError } from '../services/ranking.service';
 
 export async function createGameHandler(req: Request, res: Response) {
   try {
@@ -21,6 +22,16 @@ export async function createGameHandler(req: Request, res: Response) {
 
     return res.status(201).json(game);
   } catch (error) {
+    if (error instanceof RankingGenerationError) {
+      console.error('Ranking generation unavailable', error.details);
+
+      return res.status(503).json({
+        error:
+          'Nenhum provedor gratuito conseguiu gerar esse tema agora. Tente novamente em alguns instantes.',
+        details: error.details,
+      });
+    }
+
     console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }

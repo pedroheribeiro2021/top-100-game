@@ -1,8 +1,27 @@
+// CRITICAL: Configure Firestore emulator BEFORE any Firebase imports.
+const isLocalDev =
+  process.env.NODE_ENV === 'development' || process.env.PORT === '5001'
+
+if (isLocalDev) {
+  process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080'
+  process.env.FIREBASE_PROJECT_ID = 'top-100-game'
+  process.env.GCLOUD_PROJECT = 'top-100-game'
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = ''
+  process.env.FIREBASE_CONFIG = JSON.stringify({
+    projectId: 'top-100-game',
+    databaseURL: 'https://top-100-game.firebaseio.com',
+    storageBucket: 'top-100-game.firebasestorage.app',
+    authEmulatorHost: 'localhost:9099',
+    firestoreEmulatorHost: 'localhost:8080',
+  })
+}
+
 import * as functions from 'firebase-functions'
 import express from 'express'
 import fs from 'fs'
 import path from 'path'
 import { gamesRoutes } from './routes/games.routes'
+import { checkRankingProviders } from './services/ranking.service'
 
 function loadLocalEnvFile() {
   const possibleEnvPaths = [
@@ -84,10 +103,21 @@ app.use('/games', gamesRoutes)
 app.use('/api/games', gamesRoutes)
 
 app.get('/health', (_, res) => {
-  res.json({ status: 'ok' });
-});
+  res.json({ status: 'ok' })
+})
 
-export const api = functions.https.onRequest(app);
+app.get('/health/providers', async (_, res) => {
+  try {
+    const result = await checkRankingProviders()
+    const statusCode = result.ok ? 200 : 503
+    res.status(statusCode).json(result)
+  } catch (error) {
+    console.error('Failed to check ranking providers', error)
+    res.status(500).json({ ok: false, error: 'Failed to check ranking providers' })
+  }
+})
+
+export const api = functions.https.onRequest(app)
 
 if (process.env.PORT) {
   const port = Number(process.env.PORT)

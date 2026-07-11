@@ -38,4 +38,6 @@ export type Game = {
   status: GameStatus;
   roundPhase: RoundPhase;
   winner?: Player | null;
+  rankingSource?: "groq" | "openrouter" | "fallback";
+  rankingWarning?: string | null;
 };

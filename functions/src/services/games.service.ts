@@ -2,7 +2,7 @@
 import { db } from '../config/firestore';
 import { randomUUID } from 'crypto';
 import { generateGameCode } from '../utils/generateGameCode';
-import { generateRanking } from './gemini.service';
+import { generateRanking } from './ranking.service';
 
 const MAX_ROUNDS = 5;
 const ROUND_TIME_LIMIT_SECONDS = 180;
@@ -45,7 +45,7 @@ function buildRoundHistoryEntry(
 export async function createGame(theme: string) {
   const id = randomUUID();
   const gameCode = generateGameCode();
-  const ranking = await generateRanking(theme);
+  const rankingResult = await generateRanking(theme);
 
   const game = {
     id,
@@ -53,7 +53,9 @@ export async function createGame(theme: string) {
     status: 'RANKING_READY',
     roundPhase: null,
     players: [],
-    ranking,
+    ranking: rankingResult.ranking,
+    rankingSource: rankingResult.source,
+    rankingWarning: rankingResult.warning,
     currentRound: 0,
     currentRoundAnswers: [],
     roundHistory: [],
