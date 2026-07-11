@@ -3,7 +3,7 @@
   "scripts": {
     "lint": "eslint src",
     "build": "tsc",
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only -r ./src/env-config.ts src/index.ts",
     "serve": "npm run build && firebase emulators:start --only functions"
   },
   "engines": {
@@ -11,7 +11,6 @@
   },
   "main": "lib/index.js",
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
     "fastify": "^5.7.4",
     "firebase-admin": "^13.6.0",
     "firebase-functions": "^7.0.0"
