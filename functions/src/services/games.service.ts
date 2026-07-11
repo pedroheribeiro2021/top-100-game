@@ -139,6 +139,65 @@ function buildRoundHistoryEntry(
   };
 }
 
+function toMillis(value: any): number {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  if (typeof value?.toDate === 'function') return value.toDate().getTime();
+  return new Date(value).getTime();
+}
+
+function isRoundExpired(game: any): boolean {
+  if (game.roundPhase !== 'ANSWERING') return false;
+  if (!game.roundDeadlineAt) return false;
+
+  return toMillis(game.roundDeadlineAt) <= Date.now();
+}
+
+/**
+ * Fecha a rodada atual: pontua quem respondeu, ausentes ficam em 0
+ * (DOMAIN §3). Usado tanto pelo avanço manual quanto pela expiração lazy.
+ */
+function buildRoundClosureUpdate(game: any) {
+  const scoredPlayers = scorePlayers(game.players, game.currentRoundAnswers || []);
+  const roundHistory = [...(game.roundHistory || [])];
+
+  roundHistory.push(
+    buildRoundHistoryEntry(
+      game.currentRound,
+      game.currentRoundAnswers || [],
+      scoredPlayers,
+    ),
+  );
+
+  if (game.currentRound >= game.maxRounds) {
+    const sortedPlayers = [...scoredPlayers].sort((a, b) => b.score - a.score);
+
+    return {
+      players: scoredPlayers,
+      currentRound: game.currentRound,
+      currentRoundAnswers: game.currentRoundAnswers || [],
+      roundPhase: 'RESULT',
+      roundHistory,
+      roundDeadlineAt: null,
+      status: 'FINISHED',
+      winner: sortedPlayers[0],
+      updatedAt: new Date(),
+    };
+  }
+
+  return {
+    players: scoredPlayers,
+    currentRound: game.currentRound + 1,
+    currentRoundAnswers: [],
+    roundPhase: 'ANSWERING',
+    roundHistory,
+    roundDeadlineAt: getNextRoundDeadline(game.roundTimeLimit),
+    status: game.status,
+    winner: game.winner || null,
+    updatedAt: new Date(),
+  };
+}
+
 export async function createGame(input: CreateGameInput) {
   const id = randomUUID();
   const gameCode = generateGameCode();
@@ -174,10 +233,32 @@ export async function createGame(input: CreateGameInput) {
   return game;
 }
 
+/**
+ * Sem Cloud Scheduler (custo zero, ADR-0001): a expiração da rodada é
+ * aplicada de forma lazy, na primeira request que chegar após o
+ * `roundDeadlineAt` (getGameById via polling, ou submitAnswer). A
+ * transação garante que duas requests concorrentes não fecham a rodada
+ * duas vezes.
+ */
+export async function applyRoundTimeoutIfNeeded(gameId: string) {
+  const docRef = db.collection('games').doc(gameId);
+
+  return db.runTransaction(async (transaction: any) => {
+    const snapshot = await transaction.get(docRef);
+    if (!snapshot.exists) return null;
+
+    const game = snapshot.data();
+    if (!game || !isRoundExpired(game)) return game;
+
+    const update = buildRoundClosureUpdate(game);
+    transaction.update(docRef, update);
+
+    return { ...game, ...update };
+  });
+}
+
 export async function getGameById(id: string) {
-  const doc = await db.collection('games').doc(id).get();
-  if (!doc.exists) return null;
-  return doc.data();
+  return applyRoundTimeoutIfNeeded(id);
 }
 
 export async function getGameByCode(code: string) {
@@ -294,6 +375,12 @@ export async function submitAnswer(
 
   if (game.status === 'FINISHED') throw new Error('GAME_FINISHED');
   if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
+
+  if (isRoundExpired(game)) {
+    await applyRoundTimeoutIfNeeded(gameId);
+    throw new Error('ROUND_EXPIRED');
+  }
+
   if (game.roundPhase !== 'ANSWERING')
     throw new Error('ROUND_NOT_ACCEPTING_ANSWERS');
 
@@ -387,45 +474,12 @@ export async function advanceRound(gameId: string) {
 
   if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
 
-  const scoredPlayers = scorePlayers(game.players, game.currentRoundAnswers || []);
-  const roundHistory = [...(game.roundHistory || [])];
+  const update = buildRoundClosureUpdate(game);
+  await db.collection('games').doc(gameId).update(update);
 
-  roundHistory.push(
-    buildRoundHistoryEntry(
-      game.currentRound,
-      game.currentRoundAnswers || [],
-      scoredPlayers,
-    ),
-  );
-
-  if (game.currentRound >= game.maxRounds) {
-    const sortedPlayers = [...scoredPlayers].sort((a, b) => b.score - a.score);
-
-    await db.collection('games').doc(gameId).update({
-      players: scoredPlayers,
-      currentRoundAnswers: game.currentRoundAnswers || [],
-      roundPhase: 'RESULT',
-      roundHistory,
-      roundDeadlineAt: null,
-      status: 'FINISHED',
-      winner: sortedPlayers[0],
-      updatedAt: new Date(),
-    });
-
+  if (update.status === 'FINISHED') {
     return { message: 'Game finished', currentRound: game.currentRound };
   }
 
-  const nextRound = game.currentRound + 1;
-
-  await db.collection('games').doc(gameId).update({
-    players: scoredPlayers,
-    currentRound: nextRound,
-    currentRoundAnswers: [],
-    roundPhase: 'ANSWERING',
-    roundHistory,
-    roundDeadlineAt: getNextRoundDeadline(game.roundTimeLimit),
-    updatedAt: new Date(),
-  });
-
-  return { message: 'Round advanced', currentRound: nextRound };
+  return { message: 'Round advanced', currentRound: update.currentRound };
 }
