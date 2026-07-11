@@ -13,11 +13,12 @@ Documento por partida (id = UUID). Campos atuais:
 | `themeId` | string \| null | slug do tema no banco; `null` quando o ranking veio do fallback de IA (flag `ENABLE_AI_FALLBACK`) |
 | `status` | `RANKING_READY` \| `STARTED` \| `FINISHED` | estados em DOMAIN §8 |
 | `roundPhase` | `ANSWERING` \| `RESULT` \| null | fase da rodada |
-| `players` | `{id, name, score}[]` | 2–5; primeiro é o host (backlog 04 adiciona `isHost`) |
+| `hostId` | string | id do jogador criador; só ele pode iniciar (`startGame`) |
+| `players` | `{id, name, score}[]` | 1–5 (host entra na criação); nome duplicado é recusado (`NAME_TAKEN`), 6º jogador recebe `GAME_FULL` |
 | `ranking` | `{position, value, aliases?}[]` | **secreto** — nunca sai na API antes de FINISHED (ADR-0002) |
-| `currentRound` / `maxRounds` | number | `maxRounds` configurável 3/5/7/10 (backlog 04; hoje constante 5) |
-| `roundTimeLimit` | number (s) | 15/30/45/60 (backlog 04; hoje constante 180) |
-| `currentRoundAnswers` | `{playerId, answer, points}[]` | limpo a cada rodada |
+| `currentRound` / `maxRounds` | number | `maxRounds` ∈ {3,5,7,10}, padrão 5 |
+| `roundTimeLimit` | number (s) | ∈ {15,30,45,60}, padrão 30 |
+| `currentRoundAnswers` | `{playerId, answer, points, alreadyUsed}[]` | limpo a cada rodada |
 | `usedItems` | string[] | valores normalizados já pontuados; nunca sai na API antes de FINISHED (ADR-0002) |
 | `roundHistory` | `{round, answers, ranking}[]` | `ranking` = placar dos jogadores |
 | `roundDeadlineAt` | timestamp \| null | expiração da rodada |
