@@ -18,6 +18,7 @@ export type RoundAnswer = {
   playerId: string;
   answer: string;
   points: number;
+  alreadyUsed: boolean;
 };
 
 export type RoundHistoryEntry = {

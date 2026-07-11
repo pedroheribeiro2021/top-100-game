@@ -18,7 +18,7 @@ Documento por partida (id = UUID). Campos atuais:
 | `currentRound` / `maxRounds` | number | `maxRounds` configurável 3/5/7/10 (backlog 04; hoje constante 5) |
 | `roundTimeLimit` | number (s) | 15/30/45/60 (backlog 04; hoje constante 180) |
 | `currentRoundAnswers` | `{playerId, answer, points}[]` | limpo a cada rodada |
-| `usedItems` | string[] | valores normalizados já pontuados (backlog 03) |
+| `usedItems` | string[] | valores normalizados já pontuados; nunca sai na API antes de FINISHED (ADR-0002) |
 | `roundHistory` | `{round, answers, ranking}[]` | `ranking` = placar dos jogadores |
 | `roundDeadlineAt` | timestamp \| null | expiração da rodada |
 | `winner` | Player \| null | definido em FINISHED |

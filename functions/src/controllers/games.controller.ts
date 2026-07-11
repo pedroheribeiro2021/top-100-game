@@ -18,7 +18,8 @@ import { listThemes } from '../services/themes.service';
 function toPublicGame(game: any) {
   if (game.status === 'FINISHED') return game;
 
-  const { ranking, ...publicGame } = game;
+  // usedItems guarda valores normalizados do ranking — também precisa ficar oculto.
+  const { ranking, usedItems, ...publicGame } = game;
   return publicGame;
 }
 
