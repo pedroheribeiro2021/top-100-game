@@ -32,10 +32,10 @@ top-100-game/
 | Método | Rota | Faz |
 |---|---|---|
 | GET | `/themes` | lista `{id, title, category}` do banco de temas (ADR-0001) |
-| POST | `/games` | cria jogo a partir de `themeId`, `random: true` ou `theme` (texto casado com o banco; sem match, IA só com flag) |
-| GET | `/games/:id` | estado do jogo (visão sanitizada; `ranking` só quando `status = FINISHED`, ADR-0002) |
-| POST | `/games/join` | entra na sala por `gameCode` |
-| POST | `/games/:id/start` | inicia (status RANKING_READY → STARTED) |
+| POST | `/games` | cria jogo a partir de `themeId`, `random: true` ou `theme` + `hostName` (obrigatório; host já entra como jogador) e opcionalmente `maxRounds` (3/5/7/10) e `roundTimeLimit` (15/30/45/60s) |
+| GET | `/games/:id` | estado do jogo (visão sanitizada; `ranking` e `usedItems` só quando `status = FINISHED`, ADR-0002) |
+| POST | `/games/join` | entra na sala por `gameCode` + `playerName` (recusa sala cheia `GAME_FULL` e nome duplicado `NAME_TAKEN`) |
+| POST | `/games/:id/start` | inicia (status RANKING_READY → STARTED); exige `playerId` do host no corpo (`NOT_HOST` senão) e ≥ 2 jogadores |
 | POST | `/games/:id/answer` | registra palpite, pontua, avança rodada quando todos responderam |
 | POST | `/games/:id/advance` | avança rodada manualmente (fallback de timeout) |
 

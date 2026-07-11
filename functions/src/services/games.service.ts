@@ -12,8 +12,11 @@ import {
   resolveThemeByQuery,
 } from './themes.service';
 
-const MAX_ROUNDS = 5;
-const ROUND_TIME_LIMIT_SECONDS = 180;
+export const ALLOWED_ROUND_COUNTS = [3, 5, 7, 10] as const;
+export const ALLOWED_ROUND_TIME_LIMITS = [15, 30, 45, 60] as const;
+export const DEFAULT_MAX_ROUNDS = 5;
+export const DEFAULT_ROUND_TIME_LIMIT_SECONDS = 30;
+const MAX_PLAYERS = 5;
 const ENABLE_AI_FALLBACK = process.env.ENABLE_AI_FALLBACK === 'true';
 
 export class ThemeNotFoundError extends Error {
@@ -26,6 +29,9 @@ type CreateGameInput = {
   theme?: string;
   themeId?: string;
   random?: boolean;
+  hostName: string;
+  maxRounds?: number;
+  roundTimeLimit?: number;
 };
 
 type ResolvedGameTheme = {
@@ -104,8 +110,8 @@ type RoundAnswer = {
   alreadyUsed: boolean;
 };
 
-function getNextRoundDeadline() {
-  return new Date(Date.now() + ROUND_TIME_LIMIT_SECONDS * 1000);
+function getNextRoundDeadline(roundTimeLimitSeconds: number) {
+  return new Date(Date.now() + roundTimeLimitSeconds * 1000);
 }
 
 function scorePlayers(players: any[], roundAnswers: RoundAnswer[]) {
@@ -137,6 +143,7 @@ export async function createGame(input: CreateGameInput) {
   const id = randomUUID();
   const gameCode = generateGameCode();
   const resolvedTheme = await resolveGameTheme(input);
+  const hostId = randomUUID();
 
   const game = {
     id,
@@ -144,7 +151,10 @@ export async function createGame(input: CreateGameInput) {
     themeId: resolvedTheme.themeId,
     status: 'RANKING_READY',
     roundPhase: null,
-    players: [],
+    hostId,
+    maxRounds: input.maxRounds ?? DEFAULT_MAX_ROUNDS,
+    roundTimeLimit: input.roundTimeLimit ?? DEFAULT_ROUND_TIME_LIMIT_SECONDS,
+    players: [{ id: hostId, name: input.hostName, score: 0 }],
     ranking: resolvedTheme.ranking,
     rankingSource: resolvedTheme.source,
     rankingWarning: resolvedTheme.warning,
@@ -200,13 +210,28 @@ export async function joinGame(gameCode: string, playerName: string) {
     throw new Error('GAME_ALREADY_STARTED');
   }
 
+  const existingPlayers: any[] = game.players || [];
+
+  if (existingPlayers.length >= MAX_PLAYERS) {
+    throw new Error('GAME_FULL');
+  }
+
+  const normalizedName = playerName.trim().toLowerCase();
+  const nameTaken = existingPlayers.some(
+    (p: any) => p.name.trim().toLowerCase() === normalizedName,
+  );
+
+  if (nameTaken) {
+    throw new Error('NAME_TAKEN');
+  }
+
   const newPlayer = {
     id: randomUUID(),
     name: playerName,
     score: 0,
   };
 
-  const updatedPlayers = [...(game.players || []), newPlayer];
+  const updatedPlayers = [...existingPlayers, newPlayer];
 
   await db.collection('games').doc(doc.id).update({
     players: updatedPlayers,
@@ -216,7 +241,7 @@ export async function joinGame(gameCode: string, playerName: string) {
   return newPlayer;
 }
 
-export async function startGame(gameId: string) {
+export async function startGame(gameId: string, playerId: string) {
   const doc = await db.collection('games').doc(gameId).get();
 
   if (!doc.exists) throw new Error('GAME_NOT_FOUND');
@@ -228,11 +253,15 @@ export async function startGame(gameId: string) {
     throw new Error('INVALID_GAME_STATE');
   }
 
-  if (!game.players || game.players.length === 0) {
-    throw new Error('NO_PLAYERS');
+  if (playerId !== game.hostId) {
+    throw new Error('NOT_HOST');
   }
 
-  const roundDeadlineAt = getNextRoundDeadline();
+  if (!game.players || game.players.length < 2) {
+    throw new Error('NOT_ENOUGH_PLAYERS');
+  }
+
+  const roundDeadlineAt = getNextRoundDeadline(game.roundTimeLimit);
 
   await db.collection('games').doc(gameId).update({
     status: 'STARTED',
@@ -312,7 +341,7 @@ export async function submitAnswer(
     );
 
     // Última rodada -> encerra jogo
-    if (game.currentRound >= MAX_ROUNDS) {
+    if (game.currentRound >= game.maxRounds) {
       newStatus = 'FINISHED';
 
       const sortedPlayers = [...updatedPlayers].sort((a, b) => b.score - a.score);
@@ -326,7 +355,7 @@ export async function submitAnswer(
       nextRound = game.currentRound + 1;
       nextRoundPhase = 'ANSWERING';
       nextRoundAnswers = [];
-      nextRoundDeadline = getNextRoundDeadline();
+      nextRoundDeadline = getNextRoundDeadline(game.roundTimeLimit);
     }
   }
 
@@ -369,7 +398,7 @@ export async function advanceRound(gameId: string) {
     ),
   );
 
-  if (game.currentRound >= MAX_ROUNDS) {
+  if (game.currentRound >= game.maxRounds) {
     const sortedPlayers = [...scoredPlayers].sort((a, b) => b.score - a.score);
 
     await db.collection('games').doc(gameId).update({
@@ -394,7 +423,7 @@ export async function advanceRound(gameId: string) {
     currentRoundAnswers: [],
     roundPhase: 'ANSWERING',
     roundHistory,
-    roundDeadlineAt: getNextRoundDeadline(),
+    roundDeadlineAt: getNextRoundDeadline(game.roundTimeLimit),
     updatedAt: new Date(),
   });
 

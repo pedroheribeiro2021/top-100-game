@@ -12,7 +12,6 @@ import {
 import { Game, Player, RoundHistoryEntry } from "@/types/game";
 import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
 
-const ROUND_TIME_LIMIT_SECONDS = 180;
 const GAME_POLL_INTERVAL_MS = 2000;
 
 export default function GamePage() {
@@ -53,25 +52,31 @@ export default function GamePage() {
       localStorage.setItem("playerId", player.id);
       setPlayerName("");
       await loadGame();
-    } catch {
-      alert("Erro ao entrar na sala");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao entrar na sala";
+      alert(message);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleStart() {
-    if (!game) return;
+    if (!game || !currentPlayer) return;
 
     try {
-      await startGame(game.id);
+      await startGame(game.id, currentPlayer.id);
       await loadGame();
-    } catch {
-      alert("Erro ao iniciar jogo");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao iniciar jogo";
+      alert(message);
     }
   }
 
   if (!game) return <div className="p-10">Carregando...</div>;
+
+  const isHost = currentPlayer?.id === game.hostId;
 
   return (
     <main className="min-h-screen bg-gray-900 p-8 text-white">
@@ -91,23 +96,30 @@ export default function GamePage() {
 
       {game.status === "RANKING_READY" && (
         <div className="mt-6 space-y-4">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Seu nome"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="rounded bg-gray-800 p-2"
-            />
+          <p className="text-sm text-gray-300">
+            {game.maxRounds} rodadas · {game.roundTimeLimit}s por rodada ·{" "}
+            {game.players.length}/5 jogadores
+          </p>
 
-            <button
-              onClick={handleJoin}
-              disabled={loading}
-              className="rounded bg-blue-600 px-4"
-            >
-              Entrar
-            </button>
-          </div>
+          {!currentPlayer && (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Seu nome"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="rounded bg-gray-800 p-2"
+              />
+
+              <button
+                onClick={handleJoin}
+                disabled={loading}
+                className="rounded bg-blue-600 px-4"
+              >
+                Entrar
+              </button>
+            </div>
+          )}
 
           <div>
             <h2 className="font-bold">Jogadores:</h2>
@@ -121,16 +133,18 @@ export default function GamePage() {
                       : ""
                   }
                 >
-                  {player.name} - {player.score} pts
+                  {player.name}
+                  {player.id === game.hostId && " 👑"} - {player.score} pts
                 </li>
               ))}
             </ul>
           </div>
 
-          {game.players.length > 0 && (
+          {isHost && (
             <button
               onClick={handleStart}
-              className="rounded bg-green-600 px-4 py-2"
+              disabled={game.players.length < 2}
+              className="rounded bg-green-600 px-4 py-2 disabled:opacity-50"
             >
               Iniciar jogo
             </button>
@@ -234,14 +248,16 @@ function RoundSection({
 
   return (
     <div className="mt-6 space-y-4">
-      <h2 className="font-bold">Rodada {game.currentRound}</h2>
+      <h2 className="font-bold">
+        Rodada {game.currentRound} de {game.maxRounds}
+      </h2>
 
       <div className="rounded bg-gray-800 p-3">
         <p>
           Tempo restante:{" "}
           <span className="font-bold">
             {secondsLeft === null
-              ? formatSeconds(ROUND_TIME_LIMIT_SECONDS)
+              ? formatSeconds(game.roundTimeLimit)
               : formatSeconds(secondsLeft)}
           </span>
         </p>

@@ -32,6 +32,9 @@ export type Game = {
   theme: string;
   themeId?: string | null;
   gameCode: string;
+  hostId: string;
+  maxRounds: number;
+  roundTimeLimit: number;
   currentRound: number;
   players: Player[];
   /** Só vem preenchido quando status === "FINISHED" (ADR-0002). */
