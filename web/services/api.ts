@@ -12,7 +12,10 @@ export async function createGame(theme: string) {
     body: JSON.stringify({ theme }),
   });
 
-  if (!response.ok) throw new Error("Failed to create game");
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error || "Failed to create game");
+  }
   return response.json();
 }
 
