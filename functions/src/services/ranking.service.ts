@@ -5,7 +5,7 @@ type RankingItem = {
 
 export type RankingGenerationResult = {
   ranking: RankingItem[];
-  source: 'groq' | 'openrouter' | 'fallback';
+  source: 'groq' | 'openrouter';
   warning: string | null;
 };
 
@@ -401,33 +401,6 @@ export async function checkRankingProviders() {
   };
 }
 
-// Fallback ranking generator for when all providers fail
-function generateFallbackRanking(theme: string): RankingItem[] {
-  const prefixes = [
-    ' hit',
-    ' clássico',
-    ' sucesso',
-    ' favorito',
-    ' popular',
-    ' tendência',
-    ' viral',
-    ' lendário',
-    ' icônico',
-    ' top',
-  ];
-  const items: string[] = [];
-
-  for (let i = 1; i <= 100; i++) {
-    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    items.push(`${theme}${prefix} #${i}`);
-  }
-
-  return items.map((value, index) => ({
-    position: index + 1,
-    value,
-  }));
-}
-
 export async function generateRanking(
   theme: string,
 ): Promise<RankingGenerationResult> {
@@ -456,13 +429,5 @@ export async function generateRanking(
     }
   }
 
-  // Fallback: generate simulated ranking when all providers fail
-  console.warn('All ranking providers failed, using fallback ranking');
-  const fallbackRanking = generateFallbackRanking(theme);
-
-  return {
-    ranking: fallbackRanking,
-    source: 'fallback',
-    warning: 'Ranking providers unavailable, using simulated data',
-  };
+  throw new RankingGenerationError('ALL_PROVIDERS_FAILED', failures);
 }

@@ -2,19 +2,51 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:5001/api";
 
+export type ThemeSummary = {
+  id: string;
+  title: string;
+  category: string;
+};
+
+export class CreateGameError extends Error {
+  constructor(
+    message: string,
+    readonly suggestions?: ThemeSummary[],
+  ) {
+    super(message);
+  }
+}
+
+//
+// LIST THEMES (banco de temas)
+//
+export async function getThemes(): Promise<ThemeSummary[]> {
+  const response = await fetch(`${API_URL}/themes`);
+
+  if (!response.ok) throw new Error("Failed to fetch themes");
+  return response.json();
+}
+
 //
 // CREATE GAME
 //
-export async function createGame(theme: string) {
+export async function createGame(params: {
+  theme?: string;
+  themeId?: string;
+  random?: boolean;
+}) {
   const response = await fetch(`${API_URL}/games`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ theme }),
+    body: JSON.stringify(params),
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => null);
-    throw new Error(err?.error || "Failed to create game");
+    throw new CreateGameError(
+      err?.error || "Failed to create game",
+      err?.suggestions,
+    );
   }
   return response.json();
 }

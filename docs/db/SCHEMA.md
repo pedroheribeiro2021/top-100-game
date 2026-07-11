@@ -10,7 +10,7 @@ Documento por partida (id = UUID). Campos atuais:
 | `id` | string | UUID do documento |
 | `gameCode` | string | 6 chars, usado para entrar na sala |
 | `theme` | string | título do tema |
-| `themeId` | string | slug do tema no banco (novo — backlog 02) |
+| `themeId` | string \| null | slug do tema no banco; `null` quando o ranking veio do fallback de IA (flag `ENABLE_AI_FALLBACK`) |
 | `status` | `RANKING_READY` \| `STARTED` \| `FINISHED` | estados em DOMAIN §8 |
 | `roundPhase` | `ANSWERING` \| `RESULT` \| null | fase da rodada |
 | `players` | `{id, name, score}[]` | 2–5; primeiro é o host (backlog 04 adiciona `isHost`) |
@@ -22,7 +22,7 @@ Documento por partida (id = UUID). Campos atuais:
 | `roundHistory` | `{round, answers, ranking}[]` | `ranking` = placar dos jogadores |
 | `roundDeadlineAt` | timestamp \| null | expiração da rodada |
 | `winner` | Player \| null | definido em FINISHED |
-| `rankingSource` | string | `bank` \| `groq` \| `openrouter` \| `fallback` |
+| `rankingSource` | string | `bank` (padrão, ADR-0001) \| `groq` \| `openrouter` (fallback opcional, só com `ENABLE_AI_FALLBACK=true`) |
 | `createdAt` / `updatedAt` | timestamp | |
 
 Sem auth: o jogador guarda `playerId` no localStorage. Risco aceito para o escopo atual.

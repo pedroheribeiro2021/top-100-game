@@ -7,21 +7,42 @@ import {
   startGame,
   submitAnswer,
   advanceRound,
+  ThemeNotFoundError,
 } from '../services/games.service';
 import { RankingGenerationError } from '../services/ranking.service';
+import { listThemes } from '../services/themes.service';
+
+/**
+ * ADR-0002: ranking (Top 100) só pode ser exposto quando o jogo termina.
+ */
+function toPublicGame(game: any) {
+  if (game.status === 'FINISHED') return game;
+
+  const { ranking, ...publicGame } = game;
+  return publicGame;
+}
 
 export async function createGameHandler(req: Request, res: Response) {
   try {
-    const { theme } = req.body;
+    const { theme, themeId, random } = req.body;
 
-    if (!theme) {
-      return res.status(400).json({ error: 'Theme is required' });
+    if (!theme && !themeId && !random) {
+      return res
+        .status(400)
+        .json({ error: 'Informe theme, themeId ou random=true' });
     }
 
-    const game = await createGame(theme);
+    const game = await createGame({ theme, themeId, random });
 
-    return res.status(201).json(game);
+    return res.status(201).json(toPublicGame(game));
   } catch (error) {
+    if (error instanceof ThemeNotFoundError) {
+      return res.status(404).json({
+        error: 'Tema não encontrado no banco',
+        suggestions: error.suggestions,
+      });
+    }
+
     if (error instanceof RankingGenerationError) {
       console.error('Ranking generation unavailable', error.details);
 
@@ -32,9 +53,17 @@ export async function createGameHandler(req: Request, res: Response) {
       });
     }
 
+    if (error instanceof Error && error.message === 'THEME_ID_NOT_FOUND') {
+      return res.status(404).json({ error: 'Tema não encontrado' });
+    }
+
     console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
+}
+
+export async function listThemesHandler(req: Request, res: Response) {
+  return res.status(200).json(listThemes());
 }
 
 export async function getGameHandler(req: Request, res: Response) {
@@ -46,7 +75,7 @@ export async function getGameHandler(req: Request, res: Response) {
     return res.status(404).json({ error: 'Game not found' });
   }
 
-  return res.status(200).json(game);
+  return res.status(200).json(toPublicGame(game));
 }
 
 export async function joinGameHandler(req: Request, res: Response) {
