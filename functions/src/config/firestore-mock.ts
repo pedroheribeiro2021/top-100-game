@@ -95,6 +95,18 @@ class InMemoryDoc {
   }
 }
 
+// Sem concorrencia real de threads no Node: a transacao so precisa expor a
+// mesma API (get/update) usada pelo client real do Firestore.
+class InMemoryTransaction {
+  async get(docRef: InMemoryDoc): Promise<InMemoryDocSnapshot> {
+    return docRef.get();
+  }
+
+  update(docRef: InMemoryDoc, data: Partial<DocData>): void {
+    void docRef.update(data);
+  }
+}
+
 interface InMemoryDocRef {
   id: string;
 }
@@ -132,6 +144,9 @@ class InMemoryDB {
 // Export a Firestore-like interface
 export const db = {
   collection: (name: string) => InMemoryDB.getInstance().collection(name),
+  runTransaction: <T>(
+    updateFunction: (transaction: InMemoryTransaction) => Promise<T>,
+  ): Promise<T> => updateFunction(new InMemoryTransaction()),
 };
 
 // For type compatibility with existing code

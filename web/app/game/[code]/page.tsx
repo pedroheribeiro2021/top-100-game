@@ -2,13 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import {
-  advanceRound,
-  getGameById,
-  joinGame,
-  startGame,
-  submitAnswer,
-} from "@/services/api";
+import { getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
 import { Game, Player, RoundHistoryEntry } from "@/types/game";
 import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
 
@@ -204,26 +198,26 @@ function RoundSection({
     return (game.currentRoundAnswers || []).some((a) => a.playerId === playerId);
   }, [game.currentRoundAnswers, playerId]);
 
+  // A expiracao da rodada e resolvida no servidor (lazy, a cada request -
+  // ver applyRoundTimeoutIfNeeded). Aqui so forcamos um reload imediato
+  // quando o tempo zera, em vez de esperar o proximo polling de 2s.
   useEffect(() => {
     if (game.status !== "STARTED") return;
     if (game.roundPhase !== "ANSWERING") return;
     if (secondsLeft === null || secondsLeft > 0) return;
     if (advancing) return;
 
-    const timeoutAdvance = async () => {
+    const nudge = async () => {
       try {
         setAdvancing(true);
-        await advanceRound(game.id);
         await reload();
-      } catch {
-        // Outro cliente pode ter avancado a rodada antes.
       } finally {
         setAdvancing(false);
       }
     };
 
-    void timeoutAdvance();
-  }, [advancing, game.id, game.roundPhase, game.status, reload, secondsLeft]);
+    void nudge();
+  }, [advancing, game.roundPhase, game.status, reload, secondsLeft]);
 
   async function handleSubmit() {
     if (!answer) return alert("Digite uma resposta");

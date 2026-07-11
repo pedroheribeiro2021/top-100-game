@@ -195,6 +195,10 @@ export async function submitAnswerHandler(req: Request, res: Response) {
 
     return res.status(200).json(result);
   } catch (error: any) {
+    if (error.message === 'ROUND_EXPIRED') {
+      return res.status(400).json({ error: 'Tempo da rodada esgotado' });
+    }
+
     return res.status(400).json({ error: error.message });
   }
 }
