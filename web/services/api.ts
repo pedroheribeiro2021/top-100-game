@@ -128,3 +128,20 @@ export async function advanceRound(gameId: string) {
 
   return response.json();
 }
+
+//
+// REMATCH (jogar novamente na mesma sala)
+//
+export async function rematchGame(gameId: string, playerId: string) {
+  const response = await fetch(`${API_URL}/games/${gameId}/rematch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId, random: true }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error || "Failed to start rematch");
+  }
+  return response.json();
+}

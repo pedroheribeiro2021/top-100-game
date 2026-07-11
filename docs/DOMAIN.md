@@ -43,5 +43,8 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 
 ## §8 Estados da partida
 ```
-RANKING_READY (lobby) → STARTED (rodadas: ANSWERING ⇄ RESULT) → [empate? morte súbita] → FINISHED
+RANKING_READY (lobby) → STARTED (rodadas: ANSWERING ⇄ RESULT)
+  → [empate na liderança ao fim da última rodada] → SUDDEN_DEATH (rodada extra só entre os empatados; repete até desempatar)
+  → FINISHED
 ```
+`SUDDEN_DEATH` reusa a mesma mecânica de rodada (ANSWERING → fecha), mas só os jogadores em `tiedPlayerIds` respondem — os demais assistem (§6). "Jogar novamente" cria um novo documento (mesmo grupo de jogadores, pontuações zeradas) e não é um estado da partida em si.

@@ -7,6 +7,7 @@ import {
   startGame,
   submitAnswer,
   advanceRound,
+  rematchGame,
   ThemeNotFoundError,
   ALLOWED_ROUND_COUNTS,
   ALLOWED_ROUND_TIME_LIMITS,
@@ -199,6 +200,12 @@ export async function submitAnswerHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Tempo da rodada esgotado' });
     }
 
+    if (error.message === 'NOT_IN_SUDDEN_DEATH') {
+      return res
+        .status(403)
+        .json({ error: 'Você não está na morte súbita desta partida' });
+    }
+
     return res.status(400).json({ error: error.message });
   }
 }
@@ -226,6 +233,47 @@ export async function advanceRoundHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Round not ready to advance' });
     }
 
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function rematchGameHandler(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { playerId, theme, themeId, random } = req.body;
+
+    if (!playerId) {
+      return res.status(400).json({ error: 'playerId is required' });
+    }
+
+    const newGame = await rematchGame(id, playerId, { theme, themeId, random });
+
+    return res.status(201).json(toPublicGame(newGame));
+  } catch (error: any) {
+    if (error.message === 'GAME_NOT_FOUND') {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    if (error.message === 'GAME_NOT_FINISHED') {
+      return res
+        .status(400)
+        .json({ error: 'A partida ainda não terminou' });
+    }
+
+    if (error.message === 'NOT_HOST') {
+      return res
+        .status(403)
+        .json({ error: 'Apenas o host pode iniciar uma nova partida' });
+    }
+
+    if (error instanceof ThemeNotFoundError) {
+      return res.status(404).json({
+        error: 'Tema não encontrado no banco',
+        suggestions: error.suggestions,
+      });
+    }
+
+    console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

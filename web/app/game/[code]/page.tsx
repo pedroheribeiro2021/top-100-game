@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { getGameById, joinGame, startGame, submitAnswer } from "@/services/api";
+import {
+  getGameById,
+  joinGame,
+  rematchGame,
+  startGame,
+  submitAnswer,
+} from "@/services/api";
 import { Game, Player, RoundHistoryEntry } from "@/types/game";
 import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
 
@@ -35,6 +41,14 @@ export default function GamePage() {
 
     return () => clearInterval(interval);
   }, [code, loadGame]);
+
+  // "Jogar novamente": quem nao clicou o botao (nao-host) descobre o novo
+  // jogo pelo proprio polling do jogo antigo e e redirecionado junto.
+  useEffect(() => {
+    if (game?.rematchGameId) {
+      window.location.href = `/game/${game.rematchGameId}`;
+    }
+  }, [game?.rematchGameId]);
 
   async function handleJoin() {
     if (!playerName) return alert("Digite seu nome");
@@ -85,6 +99,12 @@ export default function GamePage() {
       {game.rankingSource && (
         <div className="mt-4 rounded border border-blue-700 bg-blue-950/40 p-3 text-sm text-blue-200">
           Tema gerado dinamicamente por IA via {game.rankingSource}.
+        </div>
+      )}
+
+      {game.status === "SUDDEN_DEATH" && (
+        <div className="mt-4 rounded border border-red-700 bg-red-950/40 p-3 text-center font-bold text-red-300">
+          MORTE SÚBITA — empate na liderança, só os empatados jogam
         </div>
       )}
 
@@ -146,7 +166,7 @@ export default function GamePage() {
         </div>
       )}
 
-      {game.status === "STARTED" && (
+      {(game.status === "STARTED" || game.status === "SUDDEN_DEATH") && (
         <RoundSection
           game={game}
           reload={loadGame}
@@ -154,7 +174,9 @@ export default function GamePage() {
         />
       )}
 
-      {game.status === "FINISHED" && <FinalResultSection game={game} />}
+      {game.status === "FINISHED" && (
+        <FinalResultSection game={game} currentPlayer={currentPlayer} />
+      )}
     </main>
   );
 }
@@ -198,11 +220,17 @@ function RoundSection({
     return (game.currentRoundAnswers || []).some((a) => a.playerId === playerId);
   }, [game.currentRoundAnswers, playerId]);
 
+  const isSuddenDeath = game.status === "SUDDEN_DEATH";
+  const activePlayers = isSuddenDeath
+    ? game.players.filter((p) => (game.tiedPlayerIds || []).includes(p.id))
+    : game.players;
+  const isSpectator = isSuddenDeath && !!playerId && !(game.tiedPlayerIds || []).includes(playerId);
+
   // A expiracao da rodada e resolvida no servidor (lazy, a cada request -
   // ver applyRoundTimeoutIfNeeded). Aqui so forcamos um reload imediato
   // quando o tempo zera, em vez de esperar o proximo polling de 2s.
   useEffect(() => {
-    if (game.status !== "STARTED") return;
+    if (game.status !== "STARTED" && game.status !== "SUDDEN_DEATH") return;
     if (game.roundPhase !== "ANSWERING") return;
     if (secondsLeft === null || secondsLeft > 0) return;
     if (advancing) return;
@@ -237,13 +265,17 @@ function RoundSection({
     }
   }
 
-  const playersAnswered = game.currentRoundAnswers?.length || 0;
-  const totalPlayers = game.players.length;
+  const playersAnswered = (game.currentRoundAnswers || []).filter((a) =>
+    activePlayers.some((p) => p.id === a.playerId),
+  ).length;
+  const totalActivePlayers = activePlayers.length;
 
   return (
     <div className="mt-6 space-y-4">
       <h2 className="font-bold">
-        Rodada {game.currentRound} de {game.maxRounds}
+        {isSuddenDeath
+          ? "Rodada extra — morte súbita"
+          : `Rodada ${game.currentRound} de ${game.maxRounds}`}
       </h2>
 
       <div className="rounded bg-gray-800 p-3">
@@ -256,13 +288,17 @@ function RoundSection({
           </span>
         </p>
         <p>
-          Respostas recebidas: {playersAnswered}/{totalPlayers}
+          Respostas recebidas: {playersAnswered}/{totalActivePlayers}
         </p>
       </div>
 
       {game.roundPhase === "ANSWERING" && (
         <div className="space-y-3">
-          {!alreadyAnswered ? (
+          {isSpectator ? (
+            <p className="font-semibold text-gray-400">
+              Você não está na morte súbita — só assistindo até o fim desta partida.
+            </p>
+          ) : !alreadyAnswered ? (
             <div className="flex gap-2">
               <input
                 type="text"
@@ -311,14 +347,37 @@ function RoundSection({
   );
 }
 
-function FinalResultSection({ game }: { game: Game }) {
+function FinalResultSection({
+  game,
+  currentPlayer,
+}: {
+  game: Game;
+  currentPlayer: Player | null;
+}) {
+  const [rematching, setRematching] = useState(false);
   const ranking = [...game.players].sort((a, b) => b.score - a.score);
   const winner = game.winner || ranking[0] || null;
   const roundHistory = game.roundHistory || [];
+  const isHost = currentPlayer?.id === game.hostId;
 
   function handleNewGame() {
     localStorage.removeItem("playerId");
     window.location.href = "/";
+  }
+
+  async function handleRematch() {
+    if (!currentPlayer) return;
+
+    try {
+      setRematching(true);
+      const newGame = await rematchGame(game.id, currentPlayer.id);
+      window.location.href = `/game/${newGame.id}`;
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao iniciar nova partida";
+      alert(message);
+      setRematching(false);
+    }
   }
 
   return (
@@ -374,12 +433,37 @@ function FinalResultSection({ game }: { game: Game }) {
         )}
       </div>
 
-      <button
-        onClick={handleNewGame}
-        className="rounded bg-blue-600 px-4 py-2 hover:bg-blue-500"
-      >
-        Novo jogo
-      </button>
+      {game.ranking && (
+        <div>
+          <h3 className="mb-2 font-bold">Top 100 completo — {game.theme}</h3>
+          <ol className="max-h-64 list-inside list-decimal space-y-1 overflow-y-auto rounded bg-gray-800 p-3 text-sm">
+            {[...game.ranking]
+              .sort((a, b) => a.position - b.position)
+              .map((item) => (
+                <li key={item.position}>{item.value}</li>
+              ))}
+          </ol>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3">
+        {isHost && (
+          <button
+            onClick={handleRematch}
+            disabled={rematching}
+            className="rounded bg-green-600 px-4 py-2 hover:bg-green-500 disabled:opacity-50"
+          >
+            {rematching ? "Criando nova partida..." : "Jogar novamente"}
+          </button>
+        )}
+
+        <button
+          onClick={handleNewGame}
+          className="rounded bg-blue-600 px-4 py-2 hover:bg-blue-500"
+        >
+          Nova sala
+        </button>
+      </div>
     </div>
   );
 }
