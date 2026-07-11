@@ -31,7 +31,8 @@ export type Game = {
   gameCode: string;
   currentRound: number;
   players: Player[];
-  ranking: RankingItem[];
+  /** Só vem preenchido quando status === "FINISHED" (ADR-0002). */
+  ranking?: RankingItem[];
   currentRoundAnswers: RoundAnswer[];
   roundHistory?: RoundHistoryEntry[];
   roundDeadlineAt?: string | null;

@@ -10,6 +10,16 @@ import {
 } from '../services/games.service';
 import { RankingGenerationError } from '../services/ranking.service';
 
+/**
+ * ADR-0002: ranking (Top 100) só pode ser exposto quando o jogo termina.
+ */
+function toPublicGame(game: any) {
+  if (game.status === 'FINISHED') return game;
+
+  const { ranking, ...publicGame } = game;
+  return publicGame;
+}
+
 export async function createGameHandler(req: Request, res: Response) {
   try {
     const { theme } = req.body;
@@ -20,7 +30,7 @@ export async function createGameHandler(req: Request, res: Response) {
 
     const game = await createGame(theme);
 
-    return res.status(201).json(game);
+    return res.status(201).json(toPublicGame(game));
   } catch (error) {
     if (error instanceof RankingGenerationError) {
       console.error('Ranking generation unavailable', error.details);
@@ -46,7 +56,7 @@ export async function getGameHandler(req: Request, res: Response) {
     return res.status(404).json({ error: 'Game not found' });
   }
 
-  return res.status(200).json(game);
+  return res.status(200).json(toPublicGame(game));
 }
 
 export async function joinGameHandler(req: Request, res: Response) {

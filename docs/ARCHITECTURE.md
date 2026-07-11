@@ -29,7 +29,7 @@ top-100-game/
 | Método | Rota | Faz |
 |---|---|---|
 | POST | `/games` | cria jogo a partir de um tema (gera ranking) |
-| GET | `/games/:id` | estado do jogo ⚠️ hoje vaza o ranking — corrigir (backlog 01) |
+| GET | `/games/:id` | estado do jogo (visão sanitizada; `ranking` só quando `status = FINISHED`, ADR-0002) |
 | POST | `/games/join` | entra na sala por `gameCode` |
 | POST | `/games/:id/start` | inicia (status RANKING_READY → STARTED) |
 | POST | `/games/:id/answer` | registra palpite, pontua, avança rodada quando todos responderam |
