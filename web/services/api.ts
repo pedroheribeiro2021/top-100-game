@@ -1,6 +1,6 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5001/top-100-game/us-central1/api";
+  "http://localhost:5001/api";
 
 //
 // CREATE GAME
