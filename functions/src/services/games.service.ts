@@ -3,9 +3,98 @@ import { db } from '../config/firestore';
 import { randomUUID } from 'crypto';
 import { generateGameCode } from '../utils/generateGameCode';
 import { generateRanking } from './ranking.service';
+import {
+  ThemeBank,
+  ThemeSummary,
+  getRandomTheme,
+  getThemeById,
+  resolveThemeByQuery,
+} from './themes.service';
 
 const MAX_ROUNDS = 5;
 const ROUND_TIME_LIMIT_SECONDS = 180;
+const ENABLE_AI_FALLBACK = process.env.ENABLE_AI_FALLBACK === 'true';
+
+export class ThemeNotFoundError extends Error {
+  constructor(readonly suggestions: ThemeSummary[]) {
+    super('THEME_NOT_FOUND');
+  }
+}
+
+type CreateGameInput = {
+  theme?: string;
+  themeId?: string;
+  random?: boolean;
+};
+
+type ResolvedGameTheme = {
+  title: string;
+  themeId: string | null;
+  ranking: { position: number; value: string; aliases?: string[] }[];
+  source: 'bank' | 'groq' | 'openrouter';
+  warning: string | null;
+};
+
+function toRankingItems(theme: ThemeBank) {
+  return theme.items.map((item) => ({
+    position: item.position,
+    value: item.value,
+    aliases: item.aliases,
+  }));
+}
+
+async function resolveGameTheme(input: CreateGameInput): Promise<ResolvedGameTheme> {
+  if (input.random) {
+    const theme = getRandomTheme();
+    return {
+      title: theme.title,
+      themeId: theme.id,
+      ranking: toRankingItems(theme),
+      source: 'bank',
+      warning: null,
+    };
+  }
+
+  if (input.themeId) {
+    const theme = getThemeById(input.themeId);
+    if (!theme) throw new Error('THEME_ID_NOT_FOUND');
+
+    return {
+      title: theme.title,
+      themeId: theme.id,
+      ranking: toRankingItems(theme),
+      source: 'bank',
+      warning: null,
+    };
+  }
+
+  const query = input.theme;
+  if (!query) throw new Error('THEME_REQUIRED');
+
+  const match = resolveThemeByQuery(query);
+  if (match.matched) {
+    return {
+      title: match.theme.title,
+      themeId: match.theme.id,
+      ranking: toRankingItems(match.theme),
+      source: 'bank',
+      warning: null,
+    };
+  }
+
+  if (ENABLE_AI_FALLBACK) {
+    const aiResult = await generateRanking(query);
+    return {
+      title: query,
+      themeId: null,
+      ranking: aiResult.ranking,
+      source: aiResult.source,
+      warning: aiResult.warning,
+    };
+  }
+
+  throw new ThemeNotFoundError(match.suggestions);
+}
 
 type RoundAnswer = {
   playerId: string;
@@ -42,20 +131,21 @@ function buildRoundHistoryEntry(
   };
 }
 
-export async function createGame(theme: string) {
+export async function createGame(input: CreateGameInput) {
   const id = randomUUID();
   const gameCode = generateGameCode();
-  const rankingResult = await generateRanking(theme);
+  const resolvedTheme = await resolveGameTheme(input);
 
   const game = {
     id,
-    theme,
+    theme: resolvedTheme.title,
+    themeId: resolvedTheme.themeId,
     status: 'RANKING_READY',
     roundPhase: null,
     players: [],
-    ranking: rankingResult.ranking,
-    rankingSource: rankingResult.source,
-    rankingWarning: rankingResult.warning,
+    ranking: resolvedTheme.ranking,
+    rankingSource: resolvedTheme.source,
+    rankingWarning: resolvedTheme.warning,
     currentRound: 0,
     currentRoundAnswers: [],
     roundHistory: [],

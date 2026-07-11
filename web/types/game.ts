@@ -7,6 +7,7 @@ export type Player = {
 export type RankingItem = {
   position: number;
   value: string;
+  aliases?: string[];
 };
 
 export type RoundPhase = "ANSWERING" | "RESULT" | null;
@@ -28,6 +29,7 @@ export type RoundHistoryEntry = {
 export type Game = {
   id: string;
   theme: string;
+  themeId?: string | null;
   gameCode: string;
   currentRound: number;
   players: Player[];
@@ -39,6 +41,6 @@ export type Game = {
   status: GameStatus;
   roundPhase: RoundPhase;
   winner?: Player | null;
-  rankingSource?: "groq" | "openrouter" | "fallback";
+  rankingSource?: "bank" | "groq" | "openrouter";
   rankingWarning?: string | null;
 };

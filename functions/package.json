@@ -2,7 +2,7 @@
   "name": "functions",
   "scripts": {
     "lint": "eslint src",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-themes.js",
     "dev": "ts-node-dev --respawn --transpile-only -r ./src/env-config.ts src/index.ts",
     "serve": "npm run build && firebase emulators:start --only functions"
   },

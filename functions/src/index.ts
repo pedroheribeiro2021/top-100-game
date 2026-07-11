@@ -21,6 +21,7 @@ import express from 'express'
 import fs from 'fs'
 import path from 'path'
 import { gamesRoutes } from './routes/games.routes'
+import { listThemesHandler } from './controllers/games.controller'
 import { checkRankingProviders } from './services/ranking.service'
 
 function loadLocalEnvFile() {
@@ -101,6 +102,9 @@ app.use(express.json())
 
 app.use('/games', gamesRoutes)
 app.use('/api/games', gamesRoutes)
+
+app.get('/themes', listThemesHandler)
+app.get('/api/themes', listThemesHandler)
 
 app.get('/health', (_, res) => {
   res.json({ status: 'ok' })
