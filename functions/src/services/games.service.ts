@@ -3,6 +3,7 @@ import { db } from '../config/firestore';
 import { randomUUID } from 'crypto';
 import { generateGameCode } from '../utils/generateGameCode';
 import { generateRanking } from './ranking.service';
+import { normalize, findRankingItem } from './matching';
 import {
   ThemeBank,
   ThemeSummary,
@@ -100,6 +101,7 @@ type RoundAnswer = {
   playerId: string;
   answer: string;
   points: number;
+  alreadyUsed: boolean;
 };
 
 function getNextRoundDeadline() {
@@ -148,6 +150,7 @@ export async function createGame(input: CreateGameInput) {
     rankingWarning: resolvedTheme.warning,
     currentRound: 0,
     currentRoundAnswers: [],
+    usedItems: [],
     roundHistory: [],
     roundDeadlineAt: null,
     winner: null,
@@ -236,6 +239,7 @@ export async function startGame(gameId: string) {
     roundPhase: 'ANSWERING',
     currentRound: 1,
     currentRoundAnswers: [],
+    usedItems: [],
     roundHistory: [],
     roundDeadlineAt,
     updatedAt: new Date(),
@@ -273,17 +277,21 @@ export async function submitAnswer(
 
   if (alreadyAnswered) throw new Error('ALREADY_ANSWERED');
 
-  const rankingItem = game.ranking.find(
-    (item: any) => item.value.toLowerCase() === answer.toLowerCase(),
-  );
-
-  const points = rankingItem ? rankingItem.position : 0;
+  const rankingItem = findRankingItem(game.ranking, answer);
+  const usedItems: string[] = game.usedItems || [];
+  const normalizedValue = rankingItem ? normalize(rankingItem.value) : null;
+  const alreadyUsed = normalizedValue !== null && usedItems.includes(normalizedValue);
+  const points = rankingItem && !alreadyUsed ? rankingItem.position : 0;
 
   const newAnswer = {
     playerId,
     answer,
     points,
+    alreadyUsed,
   };
+
+  const updatedUsedItems =
+    normalizedValue && !alreadyUsed ? [...usedItems, normalizedValue] : usedItems;
 
   const updatedAnswers = [...(game.currentRoundAnswers || []), newAnswer];
 
@@ -326,6 +334,7 @@ export async function submitAnswer(
     players: updatedPlayers,
     currentRound: nextRound,
     currentRoundAnswers: nextRoundAnswers,
+    usedItems: updatedUsedItems,
     roundPhase: nextRoundPhase,
     roundHistory,
     roundDeadlineAt: nextRoundDeadline,

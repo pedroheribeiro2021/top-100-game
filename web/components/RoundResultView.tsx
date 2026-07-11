@@ -4,6 +4,7 @@ type PlayerWithRoundInfo = Player & {
   lastAnswer?: string;
   lastPosition?: number;
   lastPoints?: number;
+  lastAlreadyUsed?: boolean;
 };
 
 type Props = {
@@ -25,6 +26,7 @@ export default function RoundResultView({ game }: Props) {
       <p>Sua resposta: {currentPlayer?.lastAnswer}</p>
       <p>Posição no ranking: {currentPlayer?.lastPosition}</p>
       <p>Pontos ganhos: {currentPlayer?.lastPoints}</p>
+      {currentPlayer?.lastAlreadyUsed && <p>Item já usado</p>}
 
       <h3>Ranking Parcial</h3>
       <ul>
