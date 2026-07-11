@@ -25,10 +25,13 @@ export class ThemeNotFoundError extends Error {
   }
 }
 
-type CreateGameInput = {
+type ThemeSelection = {
   theme?: string;
   themeId?: string;
   random?: boolean;
+};
+
+type CreateGameInput = ThemeSelection & {
   hostName: string;
   maxRounds?: number;
   roundTimeLimit?: number;
@@ -50,7 +53,7 @@ function toRankingItems(theme: ThemeBank) {
   }));
 }
 
-async function resolveGameTheme(input: CreateGameInput): Promise<ResolvedGameTheme> {
+async function resolveGameTheme(input: ThemeSelection): Promise<ResolvedGameTheme> {
   if (input.random) {
     const theme = getRandomTheme();
     return {
@@ -154,8 +157,23 @@ function isRoundExpired(game: any): boolean {
 }
 
 /**
+ * Jogadores que ainda disputam a partida: todos numa rodada normal,
+ * só os empatados durante MORTE_SUBITA (DOMAIN §6).
+ */
+function getActivePlayerIds(game: any): string[] {
+  if (game.status === 'SUDDEN_DEATH') return game.tiedPlayerIds || [];
+  return (game.players || []).map((p: any) => p.id);
+}
+
+/**
  * Fecha a rodada atual: pontua quem respondeu, ausentes ficam em 0
- * (DOMAIN §3). Usado tanto pelo avanço manual quanto pela expiração lazy.
+ * (DOMAIN §3). Usado pelo avanço manual, pela expiração lazy e por
+ * submitAnswer quando todos os jogadores ativos já responderam.
+ *
+ * Ao fechar a última rodada normal ou uma rodada de morte súbita, detecta
+ * empate na liderança entre os jogadores ativos: se houver mais de um
+ * líder, o jogo entra/continua em SUDDEN_DEATH só entre os empatados
+ * (DOMAIN §6); senão, encerra com o vencedor único.
  */
 function buildRoundClosureUpdate(game: any) {
   const scoredPlayers = scorePlayers(game.players, game.currentRoundAnswers || []);
@@ -169,8 +187,32 @@ function buildRoundClosureUpdate(game: any) {
     ),
   );
 
-  if (game.currentRound >= game.maxRounds) {
-    const sortedPlayers = [...scoredPlayers].sort((a, b) => b.score - a.score);
+  const isLastNormalRound =
+    game.status === 'STARTED' && game.currentRound >= game.maxRounds;
+  const isSuddenDeathRound = game.status === 'SUDDEN_DEATH';
+
+  if (isLastNormalRound || isSuddenDeathRound) {
+    const contenderIds = isSuddenDeathRound
+      ? game.tiedPlayerIds || []
+      : scoredPlayers.map((p: any) => p.id);
+    const contenders = scoredPlayers.filter((p: any) => contenderIds.includes(p.id));
+    const maxScore = Math.max(...contenders.map((p: any) => p.score));
+    const tiedPlayers = contenders.filter((p: any) => p.score === maxScore);
+
+    if (tiedPlayers.length > 1) {
+      return {
+        players: scoredPlayers,
+        currentRound: game.currentRound + 1,
+        currentRoundAnswers: [],
+        roundPhase: 'ANSWERING',
+        roundHistory,
+        roundDeadlineAt: getNextRoundDeadline(game.roundTimeLimit),
+        status: 'SUDDEN_DEATH',
+        tiedPlayerIds: tiedPlayers.map((p: any) => p.id),
+        winner: null,
+        updatedAt: new Date(),
+      };
+    }
 
     return {
       players: scoredPlayers,
@@ -180,7 +222,8 @@ function buildRoundClosureUpdate(game: any) {
       roundHistory,
       roundDeadlineAt: null,
       status: 'FINISHED',
-      winner: sortedPlayers[0],
+      tiedPlayerIds: [],
+      winner: tiedPlayers[0],
       updatedAt: new Date(),
     };
   }
@@ -193,6 +236,7 @@ function buildRoundClosureUpdate(game: any) {
     roundHistory,
     roundDeadlineAt: getNextRoundDeadline(game.roundTimeLimit),
     status: game.status,
+    tiedPlayerIds: game.tiedPlayerIds || [],
     winner: game.winner || null,
     updatedAt: new Date(),
   };
@@ -220,12 +264,14 @@ export async function createGame(input: CreateGameInput) {
     currentRound: 0,
     currentRoundAnswers: [],
     usedItems: [],
+    tiedPlayerIds: [],
     roundHistory: [],
     roundDeadlineAt: null,
     winner: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     gameCode,
+    rematchGameId: null,
   };
 
   await db.collection('games').doc(id).set(game);
@@ -350,6 +396,7 @@ export async function startGame(gameId: string, playerId: string) {
     currentRound: 1,
     currentRoundAnswers: [],
     usedItems: [],
+    tiedPlayerIds: [],
     roundHistory: [],
     roundDeadlineAt,
     updatedAt: new Date(),
@@ -374,7 +421,8 @@ export async function submitAnswer(
   if (!game) throw new Error('GAME_NOT_FOUND');
 
   if (game.status === 'FINISHED') throw new Error('GAME_FINISHED');
-  if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
+  if (game.status !== 'STARTED' && game.status !== 'SUDDEN_DEATH')
+    throw new Error('INVALID_GAME_STATE');
 
   if (isRoundExpired(game)) {
     await applyRoundTimeoutIfNeeded(gameId);
@@ -386,6 +434,12 @@ export async function submitAnswer(
 
   const player = game.players.find((p: any) => p.id === playerId);
   if (!player) throw new Error('PLAYER_NOT_FOUND');
+
+  const activePlayerIds = getActivePlayerIds(game);
+
+  if (!activePlayerIds.includes(playerId)) {
+    throw new Error('NOT_IN_SUDDEN_DEATH');
+  }
 
   const alreadyAnswered = (game.currentRoundAnswers || []).some(
     (a: any) => a.playerId === playerId,
@@ -411,52 +465,28 @@ export async function submitAnswer(
 
   const updatedAnswers = [...(game.currentRoundAnswers || []), newAnswer];
 
-  let updatedPlayers = game.players;
-  let newStatus = game.status;
-  let winner = game.winner || null;
-  let nextRound = game.currentRound;
-  let nextRoundPhase = 'ANSWERING';
-  let nextRoundAnswers = updatedAnswers;
-  let nextRoundDeadline = game.roundDeadlineAt || null;
-  const roundHistory = [...(game.roundHistory || [])];
+  const allActiveAnswered = activePlayerIds.every((id: string) =>
+    updatedAnswers.some((a: any) => a.playerId === id),
+  );
 
-  if (updatedAnswers.length === game.players.length) {
-    updatedPlayers = scorePlayers(game.players, updatedAnswers);
-
-    roundHistory.push(
-      buildRoundHistoryEntry(game.currentRound, updatedAnswers, updatedPlayers),
-    );
-
-    // Última rodada -> encerra jogo
-    if (game.currentRound >= game.maxRounds) {
-      newStatus = 'FINISHED';
-
-      const sortedPlayers = [...updatedPlayers].sort((a, b) => b.score - a.score);
-      winner = sortedPlayers[0];
-
-      nextRoundPhase = 'RESULT';
-      nextRoundAnswers = updatedAnswers;
-      nextRoundDeadline = null;
-    } else {
-      // Avanço automático para próxima rodada
-      nextRound = game.currentRound + 1;
-      nextRoundPhase = 'ANSWERING';
-      nextRoundAnswers = [];
-      nextRoundDeadline = getNextRoundDeadline(game.roundTimeLimit);
-    }
-  }
+  const update = allActiveAnswered
+    ? buildRoundClosureUpdate({ ...game, currentRoundAnswers: updatedAnswers })
+    : {
+        players: game.players,
+        currentRound: game.currentRound,
+        currentRoundAnswers: updatedAnswers,
+        roundPhase: game.roundPhase,
+        roundHistory: game.roundHistory || [],
+        roundDeadlineAt: game.roundDeadlineAt || null,
+        status: game.status,
+        tiedPlayerIds: game.tiedPlayerIds || [],
+        winner: game.winner || null,
+        updatedAt: new Date(),
+      };
 
   await db.collection('games').doc(gameId).update({
-    players: updatedPlayers,
-    currentRound: nextRound,
-    currentRoundAnswers: nextRoundAnswers,
+    ...update,
     usedItems: updatedUsedItems,
-    roundPhase: nextRoundPhase,
-    roundHistory,
-    roundDeadlineAt: nextRoundDeadline,
-    status: newStatus,
-    winner,
-    updatedAt: new Date(),
   });
 
   return newAnswer;
@@ -472,7 +502,8 @@ export async function advanceRound(gameId: string) {
   const game = doc.data();
   if (!game) throw new Error('GAME_NOT_FOUND');
 
-  if (game.status !== 'STARTED') throw new Error('INVALID_GAME_STATE');
+  if (game.status !== 'STARTED' && game.status !== 'SUDDEN_DEATH')
+    throw new Error('INVALID_GAME_STATE');
 
   const update = buildRoundClosureUpdate(game);
   await db.collection('games').doc(gameId).update(update);
@@ -482,4 +513,68 @@ export async function advanceRound(gameId: string) {
   }
 
   return { message: 'Round advanced', currentRound: update.currentRound };
+}
+
+/**
+ * "Jogar novamente" (DOMAIN §6): cria um novo documento para o mesmo grupo
+ * de jogadores (pontuações e usedItems zerados, tema novo), e aponta o
+ * jogo finalizado antigo para ele (`rematchGameId`) para que os demais
+ * clientes, que só sabem pollar o jogo antigo, sigam automaticamente.
+ */
+export async function rematchGame(
+  gameId: string,
+  hostId: string,
+  themeSelection: ThemeSelection = {},
+) {
+  const doc = await db.collection('games').doc(gameId).get();
+  if (!doc.exists) throw new Error('GAME_NOT_FOUND');
+
+  const game = doc.data();
+  if (!game) throw new Error('GAME_NOT_FOUND');
+
+  if (game.status !== 'FINISHED') throw new Error('GAME_NOT_FINISHED');
+  if (hostId !== game.hostId) throw new Error('NOT_HOST');
+
+  const hasThemeSelection =
+    themeSelection.theme || themeSelection.themeId || themeSelection.random;
+  const resolvedTheme = await resolveGameTheme(
+    hasThemeSelection ? themeSelection : { random: true },
+  );
+
+  const newId = randomUUID();
+
+  const newGame = {
+    id: newId,
+    theme: resolvedTheme.title,
+    themeId: resolvedTheme.themeId,
+    status: 'RANKING_READY',
+    roundPhase: null,
+    hostId: game.hostId,
+    maxRounds: game.maxRounds,
+    roundTimeLimit: game.roundTimeLimit,
+    players: (game.players || []).map((p: any) => ({ ...p, score: 0 })),
+    ranking: resolvedTheme.ranking,
+    rankingSource: resolvedTheme.source,
+    rankingWarning: resolvedTheme.warning,
+    currentRound: 0,
+    currentRoundAnswers: [],
+    usedItems: [],
+    tiedPlayerIds: [],
+    roundHistory: [],
+    roundDeadlineAt: null,
+    winner: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    gameCode: generateGameCode(),
+    rematchGameId: null,
+  };
+
+  await db.collection('games').doc(newId).set(newGame);
+
+  await db.collection('games').doc(gameId).update({
+    rematchGameId: newId,
+    updatedAt: new Date(),
+  });
+
+  return newGame;
 }

@@ -11,18 +11,20 @@ Documento por partida (id = UUID). Campos atuais:
 | `gameCode` | string | 6 chars, usado para entrar na sala |
 | `theme` | string | título do tema |
 | `themeId` | string \| null | slug do tema no banco; `null` quando o ranking veio do fallback de IA (flag `ENABLE_AI_FALLBACK`) |
-| `status` | `RANKING_READY` \| `STARTED` \| `FINISHED` | estados em DOMAIN §8 |
+| `status` | `RANKING_READY` \| `STARTED` \| `SUDDEN_DEATH` \| `FINISHED` | estados em DOMAIN §8 |
 | `roundPhase` | `ANSWERING` \| `RESULT` \| null | fase da rodada |
-| `hostId` | string | id do jogador criador; só ele pode iniciar (`startGame`) |
+| `hostId` | string | id do jogador criador; só ele pode iniciar (`startGame`) e pedir rematch |
 | `players` | `{id, name, score}[]` | 1–5 (host entra na criação); nome duplicado é recusado (`NAME_TAKEN`), 6º jogador recebe `GAME_FULL` |
 | `ranking` | `{position, value, aliases?}[]` | **secreto** — nunca sai na API antes de FINISHED (ADR-0002) |
-| `currentRound` / `maxRounds` | number | `maxRounds` ∈ {3,5,7,10}, padrão 5 |
+| `currentRound` / `maxRounds` | number | `maxRounds` ∈ {3,5,7,10}, padrão 5; `currentRound` continua subindo além de `maxRounds` durante SUDDEN_DEATH |
 | `roundTimeLimit` | number (s) | ∈ {15,30,45,60}, padrão 30 |
 | `currentRoundAnswers` | `{playerId, answer, points, alreadyUsed}[]` | limpo a cada rodada |
 | `usedItems` | string[] | valores normalizados já pontuados; nunca sai na API antes de FINISHED (ADR-0002) |
+| `tiedPlayerIds` | string[] | ids empatados na liderança durante `SUDDEN_DEATH` (DOMAIN §6); só eles podem responder |
 | `roundHistory` | `{round, answers, ranking}[]` | `ranking` = placar dos jogadores |
 | `roundDeadlineAt` | timestamp \| null | expiração da rodada |
 | `winner` | Player \| null | definido em FINISHED |
+| `rematchGameId` | string \| null | id do novo jogo criado por "jogar novamente" (`POST /:id/rematch`); clientes que ainda pollam o jogo antigo seguem para ele |
 | `rankingSource` | string | `bank` (padrão, ADR-0001) \| `groq` \| `openrouter` (fallback opcional, só com `ENABLE_AI_FALLBACK=true`) |
 | `createdAt` / `updatedAt` | timestamp | |
 
