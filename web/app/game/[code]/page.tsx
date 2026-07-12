@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   advanceRound,
@@ -19,16 +19,27 @@ export default function GamePage() {
   const params = useParams<{ code: string }>();
   const code = params.code;
   const [game, setGame] = useState<Game | null>(null);
+  const [gameNotFound, setGameNotFound] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [loading, setLoading] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentPlayer = useCurrentPlayer(game);
 
   const loadGame = useCallback(async () => {
     if (!code) return;
 
-    const data = await getGameById(code as string);
-    setGame(data);
+    try {
+      const data = await getGameById(code as string);
+      setGame(data);
+    } catch {
+      setGameNotFound(true);
+
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    }
   }, [code]);
 
   useEffect(() => {
@@ -36,11 +47,13 @@ export default function GamePage() {
 
     void loadGame();
 
-    const interval = setInterval(() => {
+    pollIntervalRef.current = setInterval(() => {
       void loadGame();
     }, GAME_POLL_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
   }, [code, loadGame]);
 
   async function handleJoin() {
@@ -69,6 +82,14 @@ export default function GamePage() {
     } catch {
       alert("Erro ao iniciar jogo");
     }
+  }
+
+  if (gameNotFound) {
+    return (
+      <div className="p-10">
+        Sala nao encontrada. Ela pode ter expirado ou o servidor foi reiniciado.
+      </div>
+    );
   }
 
   if (!game) return <div className="p-10">Carregando...</div>;
