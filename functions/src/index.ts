@@ -93,10 +93,23 @@ function configureCors(app: express.Express) {
   })
 }
 
+function logRequests(app: express.Express) {
+  app.use((req, res, next) => {
+    const start = Date.now()
+
+    res.on('finish', () => {
+      console.log(`${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`)
+    })
+
+    next()
+  })
+}
+
 loadLocalEnvFile()
 
 const app = express()
 
+logRequests(app)
 configureCors(app)
 app.use(express.json())
 
@@ -119,6 +132,16 @@ app.get('/health/providers', async (_, res) => {
     console.error('Failed to check ranking providers', error)
     res.status(500).json({ ok: false, error: 'Failed to check ranking providers' })
   }
+})
+
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(`Unhandled error on ${req.method} ${req.originalUrl}`, err)
+
+  if (res.headersSent) {
+    return next(err)
+  }
+
+  res.status(500).json({ error: 'Internal server error' })
 })
 
 export const api = functions.https.onRequest(app)
