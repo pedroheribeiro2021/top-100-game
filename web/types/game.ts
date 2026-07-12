@@ -12,7 +12,11 @@ export type RankingItem = {
 
 export type RoundPhase = "ANSWERING" | "RESULT" | null;
 
-export type GameStatus = "RANKING_READY" | "STARTED" | "FINISHED";
+export type GameStatus =
+  | "RANKING_READY"
+  | "STARTED"
+  | "SUDDEN_DEATH"
+  | "FINISHED";
 
 export type RoundAnswer = {
   playerId: string;
@@ -32,6 +36,9 @@ export type Game = {
   theme: string;
   themeId?: string | null;
   gameCode: string;
+  hostId: string;
+  maxRounds: number;
+  roundTimeLimit: number;
   currentRound: number;
   players: Player[];
   /** Só vem preenchido quando status === "FINISHED" (ADR-0002). */
@@ -42,6 +49,10 @@ export type Game = {
   status: GameStatus;
   roundPhase: RoundPhase;
   winner?: Player | null;
+  /** Ids dos jogadores empatados na liderança durante SUDDEN_DEATH (DOMAIN §6). */
+  tiedPlayerIds?: string[];
+  /** Id do jogo criado por "jogar novamente", se algum host já iniciou um. */
+  rematchGameId?: string | null;
   rankingSource?: "bank" | "groq" | "openrouter";
   rankingWarning?: string | null;
 };

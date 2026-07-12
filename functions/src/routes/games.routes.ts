@@ -4,6 +4,7 @@ import {
   createGameHandler,
   getGameHandler,
   joinGameHandler,
+  rematchGameHandler,
   startGameHandler,
   submitAnswerHandler,
 } from '../controllers/games.controller';
@@ -16,3 +17,4 @@ gamesRoutes.post('/join', joinGameHandler);
 gamesRoutes.post('/:id/start', startGameHandler);
 gamesRoutes.post('/:id/answer', submitAnswerHandler);
 gamesRoutes.post('/:id/advance', advanceRoundHandler);
+gamesRoutes.post('/:id/rematch', rematchGameHandler);
