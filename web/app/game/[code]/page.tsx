@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 import {
+  getGameByCode,
   getGameById,
   joinGame,
   rematchGame,
@@ -28,15 +30,22 @@ export default function GamePage() {
   const [playerName, setPlayerName] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentPlayer = useCurrentPlayer(game);
 
+  // O segmento de rota aceita tanto o codigo de 6 chars (canonico, usado no
+  // link/QR de convite) quanto o id interno (UUID, usado nas chamadas de API
+  // e mantido por compatibilidade com links antigos).
   const loadGame = useCallback(async () => {
     if (!code) return;
 
     try {
-      const data = await getGameById(code as string);
+      const data = (code as string).includes("-")
+        ? await getGameById(code as string)
+        : await getGameByCode(code as string);
       setGame(data);
     } catch {
       setGameNotFound(true);
@@ -109,6 +118,39 @@ export default function GamePage() {
     setTimeout(() => setCopied(false), 1500);
   }
 
+  function getShareUrl() {
+    if (!game || typeof window === "undefined") return "";
+    return `${window.location.origin}/game/${game.gameCode}`;
+  }
+
+  function handleCopyLink() {
+    const shareUrl = getShareUrl();
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl).catch(() => {});
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1500);
+  }
+
+  async function handleShare() {
+    const shareUrl = getShareUrl();
+    if (!shareUrl || !game) return;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "TOP 100",
+          text: `Entra na minha sala do TOP 100! Código: ${game.gameCode}`,
+          url: shareUrl,
+        });
+      } catch {
+        // usuário cancelou o share sheet — não é um erro a reportar
+      }
+      return;
+    }
+
+    handleCopyLink();
+  }
+
   if (gameNotFound) {
     return (
       <main className="flex min-h-screen items-center justify-center p-8 text-center text-white">
@@ -162,6 +204,28 @@ export default function GamePage() {
             >
               {copied ? "Copiado!" : "Copiar código"}
             </button>
+
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <RetroButton variant="primary" onClick={handleShare} className="flex-1">
+                Compartilhar link
+              </RetroButton>
+              <RetroButton variant="outline" onClick={handleCopyLink} className="flex-1">
+                {linkCopied ? "Link copiado!" : "Copiar link"}
+              </RetroButton>
+              <RetroButton
+                variant="secondary"
+                onClick={() => setShowQr((v) => !v)}
+                className="flex-1"
+              >
+                {showQr ? "Ocultar QR code" : "Mostrar QR code"}
+              </RetroButton>
+            </div>
+
+            {showQr && (
+              <div className="mt-3 flex justify-center border-2 border-gray-900 bg-white p-3">
+                <QRCodeSVG value={getShareUrl()} size={160} />
+              </div>
+            )}
           </RetroCard>
 
           <RetroCard color="yellow">

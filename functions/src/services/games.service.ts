@@ -316,7 +316,7 @@ export async function getGameByCode(code: string) {
 
   if (snapshot.empty) return null;
 
-  return snapshot.docs[0].data();
+  return applyRoundTimeoutIfNeeded(snapshot.docs[0].id);
 }
 
 export async function joinGame(gameCode: string, playerName: string) {
