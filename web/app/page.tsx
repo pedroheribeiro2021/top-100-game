@@ -50,7 +50,7 @@ export default function Home() {
         roundTimeLimit,
       });
       localStorage.setItem("playerId", game.hostId);
-      window.location.href = `/game/${game.id}`;
+      window.location.href = `/game/${game.gameCode}`;
     } catch (error: unknown) {
       if (error instanceof CreateGameError && error.suggestions) {
         setSuggestions(error.suggestions);

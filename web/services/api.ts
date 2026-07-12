@@ -65,6 +65,16 @@ export async function getGameById(id: string) {
 }
 
 //
+// GET GAME BY CODE (código de 6 chars, usado no link/QR de convite)
+//
+export async function getGameByCode(code: string) {
+  const response = await fetch(`${API_URL}/games/code/${code}`);
+
+  if (!response.ok) throw new Error("Game not found");
+  return response.json();
+}
+
+//
 // JOIN GAME
 //
 export async function joinGame(gameCode: string, playerName: string) {

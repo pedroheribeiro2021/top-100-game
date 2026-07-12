@@ -18,7 +18,7 @@ top-100-game/
 │  └─ scripts/copy-themes.js         # build copia data/themes/ p/ lib/data/themes (deploy só empacota functions/)
 ├─ web/                  # Front (Next.js 16 + Tailwind 4)
 │  └─ app/page.tsx                   # Home: criar sala
-│  └─ app/game/[code]/page.tsx       # Sala: lobby + jogo + resultados (polling 2s)
+│  └─ app/game/[code]/page.tsx       # Sala: lobby (link/QR de convite) + jogo + resultados (polling 2s)
 │  └─ components/RoundResultView.tsx # revelação da rodada
 │  └─ hooks/useCurrentPlayer.ts      # identifica jogador via localStorage
 │  └─ services/api.ts                # client HTTP da API
@@ -33,6 +33,7 @@ top-100-game/
 | GET | `/themes` | lista `{id, title, category}` do banco de temas (ADR-0001) |
 | POST | `/games` | cria jogo a partir de `themeId`, `random: true` ou `theme` + `hostName` (obrigatório; host já entra como jogador) e opcionalmente `maxRounds` (3/5/7/10) e `roundTimeLimit` (15/30/45/60s) |
 | GET | `/games/:id` | estado do jogo (visão sanitizada; `ranking` e `usedItems` só quando `status = FINISHED`, ADR-0002) |
+| GET | `/games/code/:code` | estado do jogo por `gameCode` (6 chars, case-insensitive); usado pelo link/QR de convite — mesma sanitização de `/games/:id` |
 | POST | `/games/join` | entra na sala por `gameCode` + `playerName` (recusa sala cheia `GAME_FULL` e nome duplicado `NAME_TAKEN`) |
 | POST | `/games/:id/start` | inicia (status RANKING_READY → STARTED); exige `playerId` do host no corpo (`NOT_HOST` senão) e ≥ 2 jogadores |
 | POST | `/games/:id/answer` | registra palpite, pontua, avança rodada quando todos os jogadores ativos responderam; recusa após o prazo (`ROUND_EXPIRED`) e recusa quem está fora da morte súbita (`NOT_IN_SUDDEN_DEATH`) |

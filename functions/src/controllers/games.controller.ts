@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import {
   createGame,
   getGameById,
+  getGameByCode,
   joinGame,
   startGame,
   submitAnswer,
@@ -105,6 +106,23 @@ export async function getGameHandler(req: Request, res: Response) {
     const { id } = req.params;
 
     const game = await getGameById(id);
+
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    return res.status(200).json(toPublicGame(game));
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function getGameByCodeHandler(req: Request, res: Response) {
+  try {
+    const { code } = req.params;
+
+    const game = await getGameByCode(code.toUpperCase());
 
     if (!game) {
       return res.status(404).json({ error: 'Game not found' });
