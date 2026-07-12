@@ -22,6 +22,50 @@ class InMemoryCollection {
       id,
     })) as InMemoryDocRef[];
   }
+
+  where(field: string, _op: '==', value: unknown): InMemoryQuery {
+    return new InMemoryQuery(this.docs, [(data) => data[field] === value]);
+  }
+}
+
+type QueryFilter = (data: DocData) => boolean;
+
+class InMemoryQuery {
+  constructor(
+    private docs: Map<string, DocData>,
+    private filters: QueryFilter[],
+    private limitCount?: number,
+  ) {}
+
+  where(field: string, _op: '==', value: unknown): InMemoryQuery {
+    return new InMemoryQuery(
+      this.docs,
+      [...this.filters, (data) => data[field] === value],
+      this.limitCount,
+    );
+  }
+
+  limit(count: number): InMemoryQuery {
+    return new InMemoryQuery(this.docs, this.filters, count);
+  }
+
+  async get(): Promise<InMemoryQuerySnapshot> {
+    let entries = Array.from(this.docs.entries()).filter(([, data]) =>
+      this.filters.every((filter) => filter(data)),
+    );
+
+    if (this.limitCount !== undefined) {
+      entries = entries.slice(0, this.limitCount);
+    }
+
+    const docs = entries.map(([id, data]) => ({ id, data: () => data }));
+    return { empty: docs.length === 0, docs };
+  }
+}
+
+interface InMemoryQuerySnapshot {
+  empty: boolean;
+  docs: { id: string; data: () => DocData }[];
 }
 
 class InMemoryDoc {
