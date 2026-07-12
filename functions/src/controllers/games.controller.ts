@@ -3,11 +3,15 @@ import { Request, Response } from 'express';
 import {
   createGame,
   getGameById,
+  getGameByCode,
   joinGame,
   startGame,
   submitAnswer,
   advanceRound,
+  rematchGame,
   ThemeNotFoundError,
+  ALLOWED_ROUND_COUNTS,
+  ALLOWED_ROUND_TIME_LIMITS,
 } from '../services/games.service';
 import { RankingGenerationError } from '../services/ranking.service';
 import { listThemes } from '../services/themes.service';
@@ -25,7 +29,8 @@ function toPublicGame(game: any) {
 
 export async function createGameHandler(req: Request, res: Response) {
   try {
-    const { theme, themeId, random } = req.body;
+    const { theme, themeId, random, hostName, maxRounds, roundTimeLimit } =
+      req.body;
 
     if (!theme && !themeId && !random) {
       return res
@@ -33,7 +38,36 @@ export async function createGameHandler(req: Request, res: Response) {
         .json({ error: 'Informe theme, themeId ou random=true' });
     }
 
-    const game = await createGame({ theme, themeId, random });
+    if (!hostName || typeof hostName !== 'string' || !hostName.trim()) {
+      return res.status(400).json({ error: 'Informe hostName' });
+    }
+
+    if (
+      maxRounds !== undefined &&
+      !ALLOWED_ROUND_COUNTS.includes(maxRounds)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'maxRounds deve ser 3, 5, 7 ou 10' });
+    }
+
+    if (
+      roundTimeLimit !== undefined &&
+      !ALLOWED_ROUND_TIME_LIMITS.includes(roundTimeLimit)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'roundTimeLimit deve ser 15, 30, 45 ou 60' });
+    }
+
+    const game = await createGame({
+      theme,
+      themeId,
+      random,
+      hostName,
+      maxRounds,
+      roundTimeLimit,
+    });
 
     return res.status(201).json(toPublicGame(game));
   } catch (error) {
@@ -68,15 +102,37 @@ export async function listThemesHandler(req: Request, res: Response) {
 }
 
 export async function getGameHandler(req: Request, res: Response) {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-  const game = await getGameById(id);
+    const game = await getGameById(id);
 
-  if (!game) {
-    return res.status(404).json({ error: 'Game not found' });
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    return res.status(200).json(toPublicGame(game));
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
+}
 
-  return res.status(200).json(toPublicGame(game));
+export async function getGameByCodeHandler(req: Request, res: Response) {
+  try {
+    const { code } = req.params;
+
+    const game = await getGameByCode(code.toUpperCase());
+
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    return res.status(200).json(toPublicGame(game));
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 export async function joinGameHandler(req: Request, res: Response) {
@@ -101,6 +157,19 @@ export async function joinGameHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Game already started' });
     }
 
+    if (error.message === 'GAME_FULL') {
+      return res
+        .status(400)
+        .json({ error: 'Sala cheia (máximo 5 jogadores)' });
+    }
+
+    if (error.message === 'NAME_TAKEN') {
+      return res
+        .status(400)
+        .json({ error: 'Já existe um jogador com esse nome nesta sala' });
+    }
+
+    console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -108,8 +177,13 @@ export async function joinGameHandler(req: Request, res: Response) {
 export async function startGameHandler(req: Request, res: Response) {
   try {
     const { id } = req.params;
+    const { playerId } = req.body;
 
-    const result = await startGame(id);
+    if (!playerId) {
+      return res.status(400).json({ error: 'playerId is required' });
+    }
+
+    const result = await startGame(id, playerId);
 
     return res.status(200).json(result);
   } catch (error: any) {
@@ -121,12 +195,19 @@ export async function startGameHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Game cannot be started' });
     }
 
-    if (error.message === 'NO_PLAYERS') {
+    if (error.message === 'NOT_HOST') {
       return res
-        .status(400)
-        .json({ error: 'Cannot start game without players' });
+        .status(403)
+        .json({ error: 'Apenas o host pode iniciar a partida' });
     }
 
+    if (error.message === 'NOT_ENOUGH_PLAYERS') {
+      return res
+        .status(400)
+        .json({ error: 'É necessário pelo menos 2 jogadores para iniciar' });
+    }
+
+    console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -140,6 +221,17 @@ export async function submitAnswerHandler(req: Request, res: Response) {
 
     return res.status(200).json(result);
   } catch (error: any) {
+    if (error.message === 'ROUND_EXPIRED') {
+      return res.status(400).json({ error: 'Tempo da rodada esgotado' });
+    }
+
+    if (error.message === 'NOT_IN_SUDDEN_DEATH') {
+      return res
+        .status(403)
+        .json({ error: 'Você não está na morte súbita desta partida' });
+    }
+
+    console.error(error);
     return res.status(400).json({ error: error.message });
   }
 }
@@ -167,6 +259,48 @@ export async function advanceRoundHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Round not ready to advance' });
     }
 
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function rematchGameHandler(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { playerId, theme, themeId, random } = req.body;
+
+    if (!playerId) {
+      return res.status(400).json({ error: 'playerId is required' });
+    }
+
+    const newGame = await rematchGame(id, playerId, { theme, themeId, random });
+
+    return res.status(201).json(toPublicGame(newGame));
+  } catch (error: any) {
+    if (error.message === 'GAME_NOT_FOUND') {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    if (error.message === 'GAME_NOT_FINISHED') {
+      return res
+        .status(400)
+        .json({ error: 'A partida ainda não terminou' });
+    }
+
+    if (error.message === 'NOT_HOST') {
+      return res
+        .status(403)
+        .json({ error: 'Apenas o host pode iniciar uma nova partida' });
+    }
+
+    if (error instanceof ThemeNotFoundError) {
+      return res.status(404).json({
+        error: 'Tema não encontrado no banco',
+        suggestions: error.suggestions,
+      });
+    }
+
+    console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -22,6 +22,50 @@ class InMemoryCollection {
       id,
     })) as InMemoryDocRef[];
   }
+
+  where(field: string, _op: '==', value: unknown): InMemoryQuery {
+    return new InMemoryQuery(this.docs, [(data) => data[field] === value]);
+  }
+}
+
+type QueryFilter = (data: DocData) => boolean;
+
+class InMemoryQuery {
+  constructor(
+    private docs: Map<string, DocData>,
+    private filters: QueryFilter[],
+    private limitCount?: number,
+  ) {}
+
+  where(field: string, _op: '==', value: unknown): InMemoryQuery {
+    return new InMemoryQuery(
+      this.docs,
+      [...this.filters, (data) => data[field] === value],
+      this.limitCount,
+    );
+  }
+
+  limit(count: number): InMemoryQuery {
+    return new InMemoryQuery(this.docs, this.filters, count);
+  }
+
+  async get(): Promise<InMemoryQuerySnapshot> {
+    let entries = Array.from(this.docs.entries()).filter(([, data]) =>
+      this.filters.every((filter) => filter(data)),
+    );
+
+    if (this.limitCount !== undefined) {
+      entries = entries.slice(0, this.limitCount);
+    }
+
+    const docs = entries.map(([id, data]) => ({ id, data: () => data }));
+    return { empty: docs.length === 0, docs };
+  }
+}
+
+interface InMemoryQuerySnapshot {
+  empty: boolean;
+  docs: { id: string; data: () => DocData }[];
 }
 
 class InMemoryDoc {
@@ -48,6 +92,18 @@ class InMemoryDoc {
 
   async delete(): Promise<void> {
     this.docs.delete(this.id);
+  }
+}
+
+// Sem concorrencia real de threads no Node: a transacao so precisa expor a
+// mesma API (get/update) usada pelo client real do Firestore.
+class InMemoryTransaction {
+  async get(docRef: InMemoryDoc): Promise<InMemoryDocSnapshot> {
+    return docRef.get();
+  }
+
+  update(docRef: InMemoryDoc, data: Partial<DocData>): void {
+    void docRef.update(data);
   }
 }
 
@@ -88,6 +144,9 @@ class InMemoryDB {
 // Export a Firestore-like interface
 export const db = {
   collection: (name: string) => InMemoryDB.getInstance().collection(name),
+  runTransaction: <T>(
+    updateFunction: (transaction: InMemoryTransaction) => Promise<T>,
+  ): Promise<T> => updateFunction(new InMemoryTransaction()),
 };
 
 // For type compatibility with existing code

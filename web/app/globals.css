@@ -10,6 +10,22 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Design system retro arcade — docs/DESIGN.md */
+  --color-retro-navy: #1e3a8a;
+  --color-retro-violet: #7c3aed;
+  --color-retro-magenta: #9d174d;
+  --color-retro-pink: #ff2e7e;
+  --color-retro-pink-dark: #b3134f;
+  --color-retro-cyan: #22d3ee;
+  --color-retro-cyan-dark: #0c8fa3;
+  --color-retro-yellow: #fbbf24;
+  --color-retro-yellow-dark: #b6870a;
+  --color-retro-orange: #f97316;
+  --color-retro-green: #22c55e;
+  --color-retro-green-dark: #15803d;
+  --color-retro-red: #ef4444;
+  --color-retro-red-dark: #b91c1c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,7 +36,31 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(
+    135deg,
+    var(--color-retro-navy),
+    var(--color-retro-violet),
+    var(--color-retro-magenta)
+  );
+  background-attachment: fixed;
+  color: #171717;
+  font-family: var(--font-mono), ui-monospace, "Courier New", monospace;
+}
+
+/* Sombra dura deslocada, sem blur — cards e botoes retro (docs/DESIGN.md) */
+.retro-shadow-pink {
+  box-shadow: 6px 6px 0 0 var(--color-retro-pink-dark);
+}
+.retro-shadow-cyan {
+  box-shadow: 6px 6px 0 0 var(--color-retro-cyan-dark);
+}
+.retro-shadow-yellow {
+  box-shadow: 6px 6px 0 0 var(--color-retro-yellow-dark);
+}
+.retro-shadow-green {
+  box-shadow: 6px 6px 0 0 var(--color-retro-green-dark);
+}
+.retro-shadow-red {
+  box-shadow: 6px 6px 0 0 var(--color-retro-red-dark);
 }

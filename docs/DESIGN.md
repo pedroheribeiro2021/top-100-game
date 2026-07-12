@@ -29,5 +29,5 @@ Fonte: protótipo Figma <https://dodge-sorbet-20715481.figma.site> (navegado em 
 - Replay: FIM → JOGAR NOVAMENTE → JOGANDO.
 - Voltar para HOME a partir de criar/entrar/lobby/fim.
 
-## Gap atual
-O front (`web/`) usa Tailwind cinza básico e só cobre home + sala. A migração para este design é o backlog 07.
+## Estado da implementação
+O front (`web/`) segue este design system (backlog 07): tokens retrô em `globals.css`, componentes reutilizáveis `RetroCard`/`RetroButton`/`Chip`/`OnboardingOverlay`, e todas as telas (onboarding, home/criar sala, lobby, jogo, revelação, morte súbita, fim) migradas.

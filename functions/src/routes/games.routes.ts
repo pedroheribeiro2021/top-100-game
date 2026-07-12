@@ -2,8 +2,10 @@ import { Router } from 'express';
 import {
   advanceRoundHandler,
   createGameHandler,
+  getGameByCodeHandler,
   getGameHandler,
   joinGameHandler,
+  rematchGameHandler,
   startGameHandler,
   submitAnswerHandler,
 } from '../controllers/games.controller';
@@ -11,8 +13,10 @@ import {
 export const gamesRoutes = Router();
 
 gamesRoutes.post('/', createGameHandler);
+gamesRoutes.get('/code/:code', getGameByCodeHandler);
 gamesRoutes.get('/:id', getGameHandler);
 gamesRoutes.post('/join', joinGameHandler);
 gamesRoutes.post('/:id/start', startGameHandler);
 gamesRoutes.post('/:id/answer', submitAnswerHandler);
 gamesRoutes.post('/:id/advance', advanceRoundHandler);
+gamesRoutes.post('/:id/rematch', rematchGameHandler);
