@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   getGameById,
@@ -24,17 +24,28 @@ export default function GamePage() {
   const params = useParams<{ code: string }>();
   const code = params.code;
   const [game, setGame] = useState<Game | null>(null);
+  const [gameNotFound, setGameNotFound] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentPlayer = useCurrentPlayer(game);
 
   const loadGame = useCallback(async () => {
     if (!code) return;
 
-    const data = await getGameById(code as string);
-    setGame(data);
+    try {
+      const data = await getGameById(code as string);
+      setGame(data);
+    } catch {
+      setGameNotFound(true);
+
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    }
   }, [code]);
 
   useEffect(() => {
@@ -42,11 +53,13 @@ export default function GamePage() {
 
     void loadGame();
 
-    const interval = setInterval(() => {
+    pollIntervalRef.current = setInterval(() => {
       void loadGame();
     }, GAME_POLL_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
   }, [code, loadGame]);
 
   // "Jogar novamente": quem nao clicou o botao (nao-host) descobre o novo
@@ -94,6 +107,14 @@ export default function GamePage() {
     navigator.clipboard.writeText(game.gameCode).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  if (gameNotFound) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-8 text-center text-white">
+        Sala não encontrada. Ela pode ter expirado ou o servidor foi reiniciado.
+      </main>
+    );
   }
 
   if (!game) {

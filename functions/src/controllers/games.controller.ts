@@ -101,15 +101,20 @@ export async function listThemesHandler(req: Request, res: Response) {
 }
 
 export async function getGameHandler(req: Request, res: Response) {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-  const game = await getGameById(id);
+    const game = await getGameById(id);
 
-  if (!game) {
-    return res.status(404).json({ error: 'Game not found' });
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    return res.status(200).json(toPublicGame(game));
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-
-  return res.status(200).json(toPublicGame(game));
 }
 
 export async function joinGameHandler(req: Request, res: Response) {
@@ -146,6 +151,7 @@ export async function joinGameHandler(req: Request, res: Response) {
         .json({ error: 'Já existe um jogador com esse nome nesta sala' });
     }
 
+    console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -183,6 +189,7 @@ export async function startGameHandler(req: Request, res: Response) {
         .json({ error: 'É necessário pelo menos 2 jogadores para iniciar' });
     }
 
+    console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -206,6 +213,7 @@ export async function submitAnswerHandler(req: Request, res: Response) {
         .json({ error: 'Você não está na morte súbita desta partida' });
     }
 
+    console.error(error);
     return res.status(400).json({ error: error.message });
   }
 }
@@ -233,6 +241,7 @@ export async function advanceRoundHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Round not ready to advance' });
     }
 
+    console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
