@@ -13,7 +13,6 @@ top-100-game/
 │     ├─ services/games.service.ts   # REGRAS DA PARTIDA: criar, entrar, iniciar, responder, avançar
 │     ├─ services/themes.service.ts  # banco de temas: lista, busca por id/aleatório, matching por título (ADR-0001)
 │     ├─ services/ranking.service.ts # geração de ranking via Groq/OpenRouter — fallback OPCIONAL atrás de `ENABLE_AI_FALLBACK` (default off)
-│     ├─ services/generateRanking.ts # ⚠️ mock morto, não importado — remover (backlog 08)
 │     ├─ utils/generateGameCode.ts   # código de sala (6 chars)
 │     └─ utils/normalize.ts          # normalização de texto p/ matching (DOMAIN §4)
 │  └─ scripts/copy-themes.js         # build copia data/themes/ p/ lib/data/themes (deploy só empacota functions/)
@@ -56,4 +55,4 @@ top-100-game/
 - **Firestore**: coleção única `games` (ver `db/SCHEMA.md`). Sem auth — jogador é identificado por `playerId` no localStorage.
 - **Dev local**: `functions` roda com ts-node-dev + emulador Firestore (`localhost:8080`); web em `localhost:3000`.
 - **CI**: `.github/workflows/ci.yml` (lint/build de web e functions).
-- ⚠️ `functions/src/config/service-account.json` está no repositório — credencial commitada, tratar no backlog 08.
+- `functions/src/config/service-account.json` é só um arquivo local opcional (gitignored) para apontar `GOOGLE_APPLICATION_CREDENTIALS` em dev; nunca foi commitado. Em prod as credenciais vêm de `FIREBASE_SERVICE_ACCOUNT_JSON`/`GOOGLE_APPLICATION_CREDENTIALS` (env), não de arquivo versionado.

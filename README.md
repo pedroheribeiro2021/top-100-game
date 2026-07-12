@@ -9,10 +9,10 @@ cp functions/.env.example functions/.env
 cp web/.env.example web/.env.local
 ```
 
-2. Preencha as variáveis obrigatórias:
-- `GEMINI_API_KEY` em `functions/.env`
-- `CORS_ORIGINS` em `functions/.env` (lista separada por vírgula)
+2. Preencha as variáveis:
+- `CORS_ORIGINS` em `functions/.env` (obrigatória, lista separada por vírgula)
 - Variáveis `NEXT_PUBLIC_*` em `web/.env.local`
+- O jogo funciona sem nenhuma chave de IA — os temas vêm do banco local em `data/themes/` (ADR-0001). `GROQ_API_KEY`/`OPENROUTER_API_KEY` em `functions/.env` são só um fallback opcional para temas fora do banco, ativado com `ENABLE_AI_FALLBACK=true`.
 
 > Observação: o Firebase Emulator busca variáveis no escopo de `functions/.env` para Functions locais.
 
