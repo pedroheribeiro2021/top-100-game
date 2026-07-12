@@ -11,8 +11,14 @@ import {
 } from "@/services/api";
 import { Game, Player, RoundHistoryEntry } from "@/types/game";
 import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
+import RetroButton from "@/components/RetroButton";
+import RetroCard from "@/components/RetroCard";
+import Chip from "@/components/Chip";
+import { RetroColor } from "@/components/RetroCard";
+import RoundResultView from "@/components/RoundResultView";
 
 const GAME_POLL_INTERVAL_MS = 2000;
+const RANK_COLORS: RetroColor[] = ["pink", "yellow", "cyan"];
 
 export default function GamePage() {
   const params = useParams<{ code: string }>();
@@ -20,6 +26,7 @@ export default function GamePage() {
   const [game, setGame] = useState<Game | null>(null);
   const [playerName, setPlayerName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const currentPlayer = useCurrentPlayer(game);
 
@@ -82,96 +89,120 @@ export default function GamePage() {
     }
   }
 
-  if (!game) return <div className="p-10">Carregando...</div>;
+  function handleCopyCode() {
+    if (!game) return;
+    navigator.clipboard.writeText(game.gameCode).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  if (!game) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-8 text-white">
+        Carregando...
+      </main>
+    );
+  }
 
   const isHost = currentPlayer?.id === game.hostId;
 
   return (
-    <main className="min-h-screen bg-gray-900 p-8 text-white">
-      <h1 className="mb-4 text-2xl font-bold">{game.theme}</h1>
-
-      <p>
-        Codigo da sala: <span className="font-mono">{game.gameCode}</span>
-      </p>
-      <p>Status: {game.status}</p>
-      <p>Rodada atual: {game.currentRound}</p>
+    <main className="mx-auto min-h-screen max-w-2xl p-4 text-white">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold tracking-widest text-retro-yellow drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
+          {game.theme}
+        </h1>
+      </div>
 
       {game.rankingSource && (
-        <div className="mt-4 rounded border border-blue-700 bg-blue-950/40 p-3 text-sm text-blue-200">
+        <div className="mt-4 border-4 border-blue-400 bg-blue-950/60 p-3 text-center text-sm text-blue-100">
           Tema gerado dinamicamente por IA via {game.rankingSource}.
         </div>
       )}
 
       {game.status === "SUDDEN_DEATH" && (
-        <div className="mt-4 rounded border border-red-700 bg-red-950/40 p-3 text-center font-bold text-red-300">
-          MORTE SÚBITA — empate na liderança, só os empatados jogam
+        <div className="mt-4 border-4 border-retro-red-dark bg-gradient-to-r from-retro-red to-retro-orange p-3 text-center font-bold tracking-wide text-white uppercase">
+          Morte súbita — empate na liderança, só os empatados jogam
         </div>
       )}
 
       {game.status === "RANKING_READY" && (
         <div className="mt-6 space-y-4">
-          <p className="text-sm text-gray-300">
-            {game.maxRounds} rodadas · {game.roundTimeLimit}s por rodada ·{" "}
-            {game.players.length}/5 jogadores
-          </p>
+          <RetroCard color="cyan" className="text-center">
+            <p className="text-xs font-bold tracking-wide text-gray-500 uppercase">
+              Código da sala
+            </p>
+            <p className="mt-1 text-3xl font-bold tracking-[0.3em] text-gray-900">
+              {game.gameCode}
+            </p>
+            <button
+              onClick={handleCopyCode}
+              className="mt-2 text-xs font-bold text-retro-cyan-dark underline"
+            >
+              {copied ? "Copiado!" : "Copiar código"}
+            </button>
+          </RetroCard>
+
+          <RetroCard color="yellow">
+            <p className="text-sm text-gray-700">
+              <span className="font-bold">{game.maxRounds}</span> rodadas ·{" "}
+              <span className="font-bold">{game.roundTimeLimit}s</span> por rodada ·{" "}
+              <span className="font-bold">{game.players.length}/5</span> jogadores
+            </p>
+          </RetroCard>
 
           {!currentPlayer && (
-            <div className="flex gap-2">
+            <RetroCard color="pink" className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
                 placeholder="Seu nome"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                className="rounded bg-gray-800 p-2"
+                className="flex-1 border-2 border-gray-900 p-2 font-mono"
               />
 
-              <button
-                onClick={handleJoin}
-                disabled={loading}
-                className="rounded bg-blue-600 px-4"
-              >
+              <RetroButton onClick={handleJoin} disabled={loading}>
                 Entrar
-              </button>
-            </div>
+              </RetroButton>
+            </RetroCard>
           )}
 
-          <div>
-            <h2 className="font-bold">Jogadores:</h2>
-            <ul>
+          <RetroCard>
+            <p className="mb-2 text-xs font-bold tracking-wide text-gray-500 uppercase">
+              Aguardando · Jogadores
+            </p>
+            <ul className="space-y-1">
               {game.players.map((player: Player) => (
                 <li
                   key={player.id}
-                  className={
-                    currentPlayer?.id === player.id
-                      ? "font-bold text-green-400"
-                      : ""
-                  }
+                  className={`flex items-center justify-between border-b border-gray-200 py-1 last:border-0 ${
+                    currentPlayer?.id === player.id ? "font-bold text-retro-pink-dark" : "text-gray-800"
+                  }`}
                 >
-                  {player.name}
-                  {player.id === game.hostId && " 👑"} - {player.score} pts
+                  <span>
+                    {player.name}
+                    {player.id === game.hostId && " 👑"}
+                  </span>
+                  <span>{player.score} pts</span>
                 </li>
               ))}
             </ul>
-          </div>
+          </RetroCard>
 
           {isHost && (
-            <button
+            <RetroButton
               onClick={handleStart}
               disabled={game.players.length < 2}
-              className="rounded bg-green-600 px-4 py-2 disabled:opacity-50"
+              className="w-full"
             >
-              Iniciar jogo
-            </button>
+              Iniciar partida
+            </RetroButton>
           )}
         </div>
       )}
 
       {(game.status === "STARTED" || game.status === "SUDDEN_DEATH") && (
-        <RoundSection
-          game={game}
-          reload={loadGame}
-          currentPlayer={currentPlayer}
-        />
+        <RoundSection game={game} reload={loadGame} currentPlayer={currentPlayer} />
       )}
 
       {game.status === "FINISHED" && (
@@ -224,7 +255,25 @@ function RoundSection({
   const activePlayers = isSuddenDeath
     ? game.players.filter((p) => (game.tiedPlayerIds || []).includes(p.id))
     : game.players;
-  const isSpectator = isSuddenDeath && !!playerId && !(game.tiedPlayerIds || []).includes(playerId);
+  const isSpectator =
+    isSuddenDeath && !!playerId && !(game.tiedPlayerIds || []).includes(playerId);
+
+  // Itens ja acertados nesta partida (qualquer jogador, qualquer rodada) —
+  // derivado do roundHistory (ja visivel durante o jogo), sem expor o
+  // ranking secreto (ADR-0002): sao so os palpites que ja pontuaram.
+  const usedItemsSoFar = useMemo(() => {
+    const items = new Set<string>();
+    (game.roundHistory || []).forEach((entry) => {
+      entry.answers.forEach((a) => {
+        if (a.points > 0) items.add(a.answer);
+      });
+    });
+    return Array.from(items);
+  }, [game.roundHistory]);
+
+  const lastRoundEntry = (game.roundHistory || [])[
+    (game.roundHistory || []).length - 1
+  ];
 
   // A expiracao da rodada e resolvida no servidor (lazy, a cada request -
   // ver applyRoundTimeoutIfNeeded). Aqui so forcamos um reload imediato
@@ -269,80 +318,106 @@ function RoundSection({
     activePlayers.some((p) => p.id === a.playerId),
   ).length;
   const totalActivePlayers = activePlayers.length;
+  const timeProgress = Math.min(
+    100,
+    Math.max(0, ((secondsLeft ?? game.roundTimeLimit) / game.roundTimeLimit) * 100),
+  );
 
   return (
     <div className="mt-6 space-y-4">
-      <h2 className="font-bold">
-        {isSuddenDeath
-          ? "Rodada extra — morte súbita"
-          : `Rodada ${game.currentRound} de ${game.maxRounds}`}
-      </h2>
-
-      <div className="rounded bg-gray-800 p-3">
-        <p>
-          Tempo restante:{" "}
-          <span className="font-bold">
+      <RetroCard color="cyan">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold uppercase">
+            {isSuddenDeath
+              ? "Rodada extra — morte súbita"
+              : `Rodada ${game.currentRound} de ${game.maxRounds}`}
+          </h2>
+          <span className="font-mono font-bold text-retro-cyan-dark">
             {secondsLeft === null
               ? formatSeconds(game.roundTimeLimit)
               : formatSeconds(secondsLeft)}
           </span>
-        </p>
-        <p>
+        </div>
+
+        <div className="mt-2 h-3 w-full border-2 border-gray-900 bg-gray-100">
+          <div
+            className="h-full bg-retro-pink transition-all"
+            style={{ width: `${timeProgress}%` }}
+          />
+        </div>
+
+        <p className="mt-2 text-sm text-gray-600">
           Respostas recebidas: {playersAnswered}/{totalActivePlayers}
         </p>
-      </div>
+      </RetroCard>
 
       {game.roundPhase === "ANSWERING" && (
-        <div className="space-y-3">
+        <RetroCard color="pink" className="space-y-3">
           {isSpectator ? (
-            <p className="font-semibold text-gray-400">
+            <p className="font-semibold text-gray-500">
               Você não está na morte súbita — só assistindo até o fim desta partida.
             </p>
           ) : !alreadyAnswered ? (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <input
                 type="text"
-                placeholder="Sua resposta"
+                placeholder="Seu palpite"
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
-                className="rounded bg-gray-800 p-2"
+                className="flex-1 border-2 border-gray-900 p-2 font-mono"
               />
 
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="rounded bg-blue-600 px-4"
-              >
-                Enviar
-              </button>
+              <RetroButton onClick={handleSubmit} disabled={submitting}>
+                Confirmar palpite
+              </RetroButton>
             </div>
           ) : (
-            <p className="font-semibold text-green-400">
+            <p className="font-semibold text-retro-green-dark">
               Resposta enviada. Aguardando os demais jogadores...
             </p>
           )}
 
           {currentPlayer && (
-            <p className="text-sm text-gray-300">
-              Jogando como:{" "}
-              <span className="font-semibold">{currentPlayer.name}</span>
+            <p className="text-sm text-gray-600">
+              Jogando como: <span className="font-semibold">{currentPlayer.name}</span>
             </p>
           )}
-        </div>
+        </RetroCard>
       )}
 
-      <div>
-        <h3 className="font-bold">Placar ao vivo:</h3>
-        <ul>
+      {lastRoundEntry && (
+        <RoundResultView entry={lastRoundEntry} players={game.players} />
+      )}
+
+      <RetroCard>
+        <h3 className="mb-2 text-xs font-bold tracking-wide text-gray-500 uppercase">
+          Placar ao vivo
+        </h3>
+        <ul className="space-y-1">
           {[...game.players]
             .sort((a, b) => b.score - a.score)
-            .map((player) => (
-              <li key={player.id}>
-                {player.name} - {player.score} pts
+            .map((player, index) => (
+              <li key={player.id} className="flex items-center gap-2">
+                <Chip color={RANK_COLORS[index] || "cyan"}>{index + 1}</Chip>
+                <span className="flex-1 font-semibold text-gray-800">{player.name}</span>
+                <span className="font-bold text-gray-900">{player.score} pts</span>
               </li>
             ))}
         </ul>
-      </div>
+      </RetroCard>
+
+      {usedItemsSoFar.length > 0 && (
+        <RetroCard color="yellow">
+          <h3 className="mb-1 text-xs font-bold tracking-wide text-gray-500 uppercase">
+            Itens já usados
+          </h3>
+          <p className="text-sm text-gray-700">{usedItemsSoFar.join(" · ")}</p>
+        </RetroCard>
+      )}
+
+      <p className="text-center text-xs text-white/80">
+        Quanto mais baixo no ranking, mais pontos! Cada item só pode ser usado uma vez.
+      </p>
     </div>
   );
 }
@@ -355,6 +430,7 @@ function FinalResultSection({
   currentPlayer: Player | null;
 }) {
   const [rematching, setRematching] = useState(false);
+  const [showFullRanking, setShowFullRanking] = useState(false);
   const ranking = [...game.players].sort((a, b) => b.score - a.score);
   const winner = game.winner || ranking[0] || null;
   const roundHistory = game.roundHistory || [];
@@ -382,8 +458,8 @@ function FinalResultSection({
 
   return (
     <div className="mt-6 space-y-6">
-      <div className="rounded border border-green-700 bg-green-900/40 p-4">
-        <h2 className="text-xl font-bold text-green-300">Resultado final</h2>
+      <div className="border-4 border-retro-orange bg-gradient-to-r from-retro-yellow to-retro-orange p-4 text-center text-gray-900">
+        <h2 className="text-xl font-bold tracking-wide uppercase">Resultado final</h2>
         {winner ? (
           <p className="mt-2">
             Vencedor: <span className="font-bold">{winner.name}</span> com{" "}
@@ -394,75 +470,69 @@ function FinalResultSection({
         )}
       </div>
 
-      <div>
-        <h3 className="mb-2 font-bold">Ranking final</h3>
-        <ol className="list-inside list-decimal space-y-1">
-          {ranking.map((player) => (
-            <li key={player.id}>
-              {player.name} - {player.score} pts
+      <RetroCard>
+        <h3 className="mb-2 text-xs font-bold tracking-wide text-gray-500 uppercase">
+          Ranking final
+        </h3>
+        <ol className="space-y-1">
+          {ranking.map((player, index) => (
+            <li key={player.id} className="flex items-center gap-2">
+              <Chip color={RANK_COLORS[index] || "cyan"}>{index + 1}</Chip>
+              <span className="flex-1 font-semibold text-gray-800">{player.name}</span>
+              <span className="font-bold text-gray-900">{player.score} pts</span>
             </li>
           ))}
         </ol>
-      </div>
+      </RetroCard>
 
-      <div>
-        <h3 className="mb-2 font-bold">Respostas por rodada</h3>
-
-        {roundHistory.length === 0 ? (
-          <p className="text-gray-300">Sem historico de rodadas registrado.</p>
-        ) : (
-          <div className="space-y-4">
-            {roundHistory.map((entry: RoundHistoryEntry) => (
-              <div key={entry.round} className="rounded bg-gray-800 p-3">
-                <h4 className="mb-2 font-semibold text-yellow-300">
-                  Rodada {entry.round}
-                </h4>
-                <ul className="space-y-1">
-                  {entry.answers.map((a) => {
-                    const player = game.players.find((p) => p.id === a.playerId);
-                    return (
-                      <li key={`${entry.round}-${a.playerId}`}>
-                        {player?.name || a.playerId}: {a.answer} (+{a.points} pts)
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {roundHistory.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-xs font-bold tracking-wide text-white/80 uppercase">
+            Respostas por rodada
+          </h3>
+          {roundHistory.map((entry: RoundHistoryEntry) => (
+            <RoundResultView key={entry.round} entry={entry} players={game.players} />
+          ))}
+        </div>
+      )}
 
       {game.ranking && (
         <div>
-          <h3 className="mb-2 font-bold">Top 100 completo — {game.theme}</h3>
-          <ol className="max-h-64 list-inside list-decimal space-y-1 overflow-y-auto rounded bg-gray-800 p-3 text-sm">
-            {[...game.ranking]
-              .sort((a, b) => a.position - b.position)
-              .map((item) => (
-                <li key={item.position}>{item.value}</li>
-              ))}
-          </ol>
+          <RetroButton
+            variant="outline"
+            onClick={() => setShowFullRanking((v) => !v)}
+            className="w-full"
+          >
+            {showFullRanking ? "Ocultar Top 100 completo" : "Ver Top 100 completo"}
+          </RetroButton>
+
+          {showFullRanking && (
+            <RetroCard color="cyan" className="mt-2">
+              <h3 className="mb-2 font-bold text-gray-900">
+                Top 100 completo — {game.theme}
+              </h3>
+              <ol className="max-h-64 list-inside list-decimal space-y-1 overflow-y-auto text-sm text-gray-800">
+                {[...game.ranking]
+                  .sort((a, b) => a.position - b.position)
+                  .map((item) => (
+                    <li key={item.position}>{item.value}</li>
+                  ))}
+              </ol>
+            </RetroCard>
+          )}
         </div>
       )}
 
       <div className="flex flex-wrap gap-3">
         {isHost && (
-          <button
-            onClick={handleRematch}
-            disabled={rematching}
-            className="rounded bg-green-600 px-4 py-2 hover:bg-green-500 disabled:opacity-50"
-          >
+          <RetroButton onClick={handleRematch} disabled={rematching}>
             {rematching ? "Criando nova partida..." : "Jogar novamente"}
-          </button>
+          </RetroButton>
         )}
 
-        <button
-          onClick={handleNewGame}
-          className="rounded bg-blue-600 px-4 py-2 hover:bg-blue-500"
-        >
+        <RetroButton variant="secondary" onClick={handleNewGame}>
           Nova sala
-        </button>
+        </RetroButton>
       </div>
     </div>
   );
