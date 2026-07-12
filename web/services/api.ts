@@ -34,6 +34,9 @@ export async function createGame(params: {
   theme?: string;
   themeId?: string;
   random?: boolean;
+  hostName: string;
+  maxRounds?: number;
+  roundTimeLimit?: number;
 }) {
   const response = await fetch(`${API_URL}/games`, {
     method: "POST",
@@ -71,19 +74,27 @@ export async function joinGame(gameCode: string, playerName: string) {
     body: JSON.stringify({ gameCode, playerName }),
   });
 
-  if (!response.ok) throw new Error("Failed to join game");
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error || "Failed to join game");
+  }
   return response.json();
 }
 
 //
 // START GAME
 //
-export async function startGame(id: string) {
+export async function startGame(id: string, playerId: string) {
   const response = await fetch(`${API_URL}/games/${id}/start`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId }),
   });
 
-  if (!response.ok) throw new Error("Failed to start game");
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error || "Failed to start game");
+  }
   return response.json();
 }
 
@@ -115,5 +126,22 @@ export async function advanceRound(gameId: string) {
 
   if (!response.ok) throw new Error("Failed to advance round");
 
+  return response.json();
+}
+
+//
+// REMATCH (jogar novamente na mesma sala)
+//
+export async function rematchGame(gameId: string, playerId: string) {
+  const response = await fetch(`${API_URL}/games/${gameId}/rematch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId, random: true }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error || "Failed to start rematch");
+  }
   return response.json();
 }
