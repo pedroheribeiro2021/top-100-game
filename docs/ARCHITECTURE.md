@@ -23,6 +23,7 @@ top-100-game/
 │  └─ hooks/useCurrentPlayer.ts      # identifica jogador via localStorage
 │  └─ services/api.ts                # client HTTP da API
 │  └─ types/game.ts                  # tipos espelhando o documento `games`
+│  └─ app/manifest.ts, app/pwa-icon-192/, app/pwa-icon-512/, public/sw.js  # PWA: manifest, ícones (gerados via next/og) e service worker (cache do app shell; API nunca é cacheada)
 ├─ data/themes/          # BANCO DE TEMAS pré-gerados (JSON, ADR-0001)
 ├─ docs/ · prompts/ · checklists/ · templates/   # metodologia (ver docs/README.md)
 ```
@@ -31,7 +32,7 @@ top-100-game/
 | Método | Rota | Faz |
 |---|---|---|
 | GET | `/themes` | lista `{id, title, category}` do banco de temas (ADR-0001) |
-| POST | `/games` | cria jogo a partir de `themeId`, `random: true` ou `theme` + `hostName` (obrigatório; host já entra como jogador) e opcionalmente `maxRounds` (3/5/7/10) e `roundTimeLimit` (15/30/45/60s) |
+| POST | `/games` | cria jogo a partir de `themeId`, `random: true` ou `theme` + `hostName` (obrigatório; host já entra como jogador) e opcionalmente `maxRounds` (3/5/7/10) e `roundTimeLimit` (inteiro em segundos, 10–600; atalhos de UI 15/30/45/60s) |
 | GET | `/games/:id` | estado do jogo (visão sanitizada; `ranking` e `usedItems` só quando `status = FINISHED`, ADR-0002) |
 | GET | `/games/code/:code` | estado do jogo por `gameCode` (6 chars, case-insensitive); usado pelo link/QR de convite — mesma sanitização de `/games/:id` |
 | POST | `/games/join` | entra na sala por `gameCode` + `playerName` (recusa sala cheia `GAME_FULL` e nome duplicado `NAME_TAKEN`) |

@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,6 +16,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TOP 100",
   description: "O jogo de rankings ocultos",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TOP 100",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
 };
 
 export default function RootLayout({
@@ -27,6 +38,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <RegisterServiceWorker />
         {children}
       </body>
     </html>

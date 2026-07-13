@@ -7,7 +7,10 @@ import RetroButton from "@/components/RetroButton";
 import RetroCard from "@/components/RetroCard";
 
 const ROUND_OPTIONS = [3, 5, 7, 10] as const;
-const TIME_OPTIONS = [15, 30, 45, 60] as const;
+const TIME_PRESETS = [15, 30, 45, 60] as const;
+const CUSTOM_TIME_VALUE = "custom";
+const TIME_MIN_SECONDS = 10;
+const TIME_MAX_SECONDS = 600;
 
 export default function Home() {
   const [themes, setThemes] = useState<ThemeSummary[]>([]);
@@ -15,8 +18,23 @@ export default function Home() {
   const [hostName, setHostName] = useState("");
   const [maxRounds, setMaxRounds] = useState<number>(5);
   const [roundTimeLimit, setRoundTimeLimit] = useState<number>(30);
+  const [isCustomTime, setIsCustomTime] = useState(false);
+  const [customTimeValue, setCustomTimeValue] = useState<string>("30");
+  const [customTimeUnit, setCustomTimeUnit] = useState<"s" | "min">("s");
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<ThemeSummary[]>([]);
+
+  function applyCustomTime(value: string, unit: "s" | "min") {
+    const parsed = Number(value);
+    if (!value || Number.isNaN(parsed)) return;
+
+    const seconds = Math.round(unit === "min" ? parsed * 60 : parsed);
+    const clamped = Math.min(
+      TIME_MAX_SECONDS,
+      Math.max(TIME_MIN_SECONDS, seconds),
+    );
+    setRoundTimeLimit(clamped);
+  }
 
   useEffect(() => {
     getThemes()
@@ -111,18 +129,65 @@ export default function Home() {
             <label className="flex-1 text-xs font-bold tracking-wide text-gray-600 uppercase">
               Tempo
               <select
-                value={roundTimeLimit}
-                onChange={(e) => setRoundTimeLimit(Number(e.target.value))}
+                value={isCustomTime ? CUSTOM_TIME_VALUE : roundTimeLimit}
+                onChange={(e) => {
+                  if (e.target.value === CUSTOM_TIME_VALUE) {
+                    setIsCustomTime(true);
+                    applyCustomTime(customTimeValue, customTimeUnit);
+                    return;
+                  }
+                  setIsCustomTime(false);
+                  setRoundTimeLimit(Number(e.target.value));
+                }}
                 className="mt-1 w-full border-2 border-gray-900 p-2 font-mono text-sm text-gray-900"
               >
-                {TIME_OPTIONS.map((option) => (
+                {TIME_PRESETS.map((option) => (
                   <option key={option} value={option}>
                     {option}s
                   </option>
                 ))}
+                <option value={CUSTOM_TIME_VALUE}>Personalizado</option>
               </select>
             </label>
           </div>
+
+          {isCustomTime && (
+            <div className="flex items-end gap-2">
+              <label className="flex-1 text-xs font-bold tracking-wide text-gray-600 uppercase">
+                Tempo personalizado
+                <input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  value={customTimeValue}
+                  onChange={(e) => {
+                    setCustomTimeValue(e.target.value);
+                    applyCustomTime(e.target.value, customTimeUnit);
+                  }}
+                  className="mt-1 w-full border-2 border-gray-900 p-2 font-mono text-sm text-gray-900"
+                />
+              </label>
+
+              <select
+                value={customTimeUnit}
+                onChange={(e) => {
+                  const unit = e.target.value as "s" | "min";
+                  setCustomTimeUnit(unit);
+                  applyCustomTime(customTimeValue, unit);
+                }}
+                className="border-2 border-gray-900 p-2 font-mono text-sm text-gray-900"
+              >
+                <option value="s">segundos</option>
+                <option value="min">minutos</option>
+              </select>
+            </div>
+          )}
+
+          {isCustomTime && (
+            <p className="text-right text-xs text-gray-500">
+              Tempo por rodada: {roundTimeLimit}s
+            </p>
+          )}
 
           <div>
             <label className="text-xs font-bold tracking-wide text-gray-600 uppercase">

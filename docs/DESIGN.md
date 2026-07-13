@@ -15,7 +15,7 @@ Fonte: protótipo Figma <https://dodge-sorbet-20715481.figma.site> (navegado em 
 ## Fluxo de telas (todas as ações, do protótipo)
 1. **ONBOARDING** — 3 cartões: como funciona / quanto mais baixo melhor (pos 1 = 1pt, pos 98 = 98pts) / vença a partida. Ação: COMEÇAR.
 2. **HOME** — CRIAR SALA · ENTRAR NA SALA.
-3A. **CRIAR SALA** — tema (manual ou "TEMA ALEATÓRIO"), rodadas (3/5/7/10), tempo (15/30/45/60s), CRIAR (desabilitado sem tema).
+3A. **CRIAR SALA** — tema (manual ou "TEMA ALEATÓRIO"), rodadas (3/5/7/10), tempo (atalhos 15/30/45/60s ou "Personalizado" com input em segundos/minutos), CRIAR (desabilitado sem tema).
 3B. **ENTRAR NA SALA** — código (6 chars) + nome, ENTRAR.
 4. **LOBBY** — código da sala grande + botão copiar; card do tema com rodadas/tempo; lista de jogadores (2–5) com coroa no host; status "AGUARDANDO"; INICIAR PARTIDA (só host).
 5. **JOGANDO** — card do tema com "Rodada N de M" e pontos; barra de TEMPO regressiva; campo "SEU PALPITE" + CONFIRMAR PALPITE; PLACAR ao vivo (#1/#2/#3 com cores pink/amarelo/cyan); rodapé com a dica das regras; lista de itens já usados.
