@@ -12,6 +12,23 @@ const CUSTOM_TIME_VALUE = "custom";
 const TIME_MIN_SECONDS = 10;
 const TIME_MAX_SECONDS = 600;
 
+const CATEGORY_LABELS: Record<string, string> = {
+  geografia: "Geografia",
+  cinema: "Cinema",
+  musica: "Música",
+  esporte: "Esporte",
+  negocios: "Negócios",
+  natureza: "Natureza",
+  gastronomia: "Gastronomia",
+};
+
+function categoryLabel(category: string): string {
+  return (
+    CATEGORY_LABELS[category] ??
+    category.charAt(0).toUpperCase() + category.slice(1)
+  );
+}
+
 export default function Home() {
   const [themes, setThemes] = useState<ThemeSummary[]>([]);
   const [query, setQuery] = useState("");
@@ -23,6 +40,7 @@ export default function Home() {
   const [customTimeUnit, setCustomTimeUnit] = useState<"s" | "min">("s");
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<ThemeSummary[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   function applyCustomTime(value: string, unit: "s" | "min") {
     const parsed = Number(value);
@@ -50,6 +68,16 @@ export default function Home() {
       theme.title.toLowerCase().includes(normalized),
     );
   }, [themes, query]);
+
+  const categories = useMemo(() => {
+    const unique = new Set(themes.map((theme) => theme.category));
+    return Array.from(unique).sort();
+  }, [themes]);
+
+  const themesInCategory = useMemo(() => {
+    if (!selectedCategory) return [];
+    return themes.filter((theme) => theme.category === selectedCategory);
+  }, [themes, selectedCategory]);
 
   async function handleCreate(params: {
     theme?: string;
@@ -195,31 +223,76 @@ export default function Home() {
             </label>
             <input
               type="text"
-              placeholder="Buscar tema (ex: cidades, filmes...)"
+              placeholder="Ou digite um tema livre (ex: cidades, filmes...)"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="mt-1 w-full border-2 border-gray-900 p-2 font-mono"
             />
           </div>
 
-          <ul className="max-h-40 space-y-1 overflow-y-auto">
-            {filteredThemes.map((theme) => (
-              <li key={theme.id}>
-                <button
-                  onClick={() => handleCreate({ themeId: theme.id })}
-                  disabled={loading}
-                  className="w-full border-2 border-gray-300 p-2 text-left text-sm hover:border-retro-cyan-dark hover:bg-cyan-50"
-                >
-                  {theme.title}
-                  <span className="ml-2 text-xs text-gray-400">{theme.category}</span>
-                </button>
-              </li>
-            ))}
+          {query.trim() ? (
+            <ul className="max-h-40 space-y-1 overflow-y-auto">
+              {filteredThemes.map((theme) => (
+                <li key={theme.id}>
+                  <button
+                    onClick={() => handleCreate({ themeId: theme.id })}
+                    disabled={loading}
+                    className="w-full border-2 border-gray-300 p-2 text-left text-sm hover:border-retro-cyan-dark hover:bg-cyan-50"
+                  >
+                    {theme.title}
+                    <span className="ml-2 text-xs text-gray-400">{theme.category}</span>
+                  </button>
+                </li>
+              ))}
 
-            {filteredThemes.length === 0 && (
-              <li className="text-sm text-gray-400">Nenhum tema encontrado no banco.</li>
-            )}
-          </ul>
+              {filteredThemes.length === 0 && (
+                <li className="text-sm text-gray-400">Nenhum tema encontrado no banco.</li>
+              )}
+            </ul>
+          ) : selectedCategory === null ? (
+            <div className="grid grid-cols-2 gap-2">
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className="border-2 border-gray-300 p-2 text-left text-sm hover:border-retro-cyan-dark hover:bg-cyan-50"
+                >
+                  {categoryLabel(category)}
+                </button>
+              ))}
+
+              {categories.length === 0 && (
+                <p className="col-span-2 text-sm text-gray-400">Nenhuma categoria encontrada no banco.</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className="text-xs font-bold tracking-wide text-gray-500 uppercase hover:text-retro-cyan-dark"
+              >
+                ← voltar às categorias
+              </button>
+
+              <ul className="max-h-40 space-y-1 overflow-y-auto">
+                {themesInCategory.map((theme) => (
+                  <li key={theme.id}>
+                    <button
+                      onClick={() => handleCreate({ themeId: theme.id })}
+                      disabled={loading}
+                      className="w-full border-2 border-gray-300 p-2 text-left text-sm hover:border-retro-cyan-dark hover:bg-cyan-50"
+                    >
+                      {theme.title}
+                    </button>
+                  </li>
+                ))}
+
+                {themesInCategory.length === 0 && (
+                  <li className="text-sm text-gray-400">Nenhum tema encontrado nessa categoria.</li>
+                )}
+              </ul>
+            </div>
+          )}
 
           {suggestions.length > 0 && (
             <div className="border-2 border-retro-yellow-dark bg-yellow-50 p-2 text-sm">
