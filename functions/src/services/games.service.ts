@@ -13,7 +13,9 @@ import {
 } from './themes.service';
 
 export const ALLOWED_ROUND_COUNTS = [3, 5, 7, 10] as const;
-export const ALLOWED_ROUND_TIME_LIMITS = [15, 30, 45, 60] as const;
+export const ROUND_TIME_LIMIT_PRESETS = [15, 30, 45, 60] as const;
+export const MIN_ROUND_TIME_LIMIT_SECONDS = 10;
+export const MAX_ROUND_TIME_LIMIT_SECONDS = 600;
 export const DEFAULT_MAX_ROUNDS = 5;
 export const DEFAULT_ROUND_TIME_LIMIT_SECONDS = 30;
 const MAX_PLAYERS = 5;

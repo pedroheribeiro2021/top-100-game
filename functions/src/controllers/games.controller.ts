@@ -11,7 +11,8 @@ import {
   rematchGame,
   ThemeNotFoundError,
   ALLOWED_ROUND_COUNTS,
-  ALLOWED_ROUND_TIME_LIMITS,
+  MIN_ROUND_TIME_LIMIT_SECONDS,
+  MAX_ROUND_TIME_LIMIT_SECONDS,
 } from '../services/games.service';
 import { RankingGenerationError } from '../services/ranking.service';
 import { listThemes } from '../services/themes.service';
@@ -53,11 +54,13 @@ export async function createGameHandler(req: Request, res: Response) {
 
     if (
       roundTimeLimit !== undefined &&
-      !ALLOWED_ROUND_TIME_LIMITS.includes(roundTimeLimit)
+      (!Number.isInteger(roundTimeLimit) ||
+        roundTimeLimit < MIN_ROUND_TIME_LIMIT_SECONDS ||
+        roundTimeLimit > MAX_ROUND_TIME_LIMIT_SECONDS)
     ) {
-      return res
-        .status(400)
-        .json({ error: 'roundTimeLimit deve ser 15, 30, 45 ou 60' });
+      return res.status(400).json({
+        error: `roundTimeLimit deve ser um inteiro entre ${MIN_ROUND_TIME_LIMIT_SECONDS} e ${MAX_ROUND_TIME_LIMIT_SECONDS} segundos`,
+      });
     }
 
     const game = await createGame({
