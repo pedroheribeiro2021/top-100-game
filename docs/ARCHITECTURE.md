@@ -23,6 +23,7 @@ top-100-game/
 │  └─ hooks/useCurrentPlayer.ts      # identifica jogador via localStorage
 │  └─ services/api.ts                # client HTTP da API
 │  └─ types/game.ts                  # tipos espelhando o documento `games`
+│  └─ app/manifest.ts, app/pwa-icon-192/, app/pwa-icon-512/, public/sw.js  # PWA: manifest, ícones (gerados via next/og) e service worker (cache do app shell; API nunca é cacheada)
 ├─ data/themes/          # BANCO DE TEMAS pré-gerados (JSON, ADR-0001)
 ├─ docs/ · prompts/ · checklists/ · templates/   # metodologia (ver docs/README.md)
 ```
