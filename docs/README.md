@@ -12,6 +12,7 @@ Ponto único de navegação. **Leia daqui antes de abrir código.** Abra esta pa
 | Padrões de código / naming / commits | [`CONVENTIONS.md`](./CONVENTIONS.md) |
 | Termos do domínio | [`GLOSSARY.md`](./GLOSSARY.md) |
 | Decisões arquiteturais | [`adr/`](./adr/README.md) |
+| Histórico de sessões e pendências | [`Registro-de-Sessoes.md`](./Registro-de-Sessoes.md) · [`Pendencias.md`](./Pendencias.md) |
 | Dados: Firestore + banco de temas | [`db/SCHEMA.md`](./db/SCHEMA.md) |
 
 ## Recursos de trabalho (fora de docs/)

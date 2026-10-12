@@ -2,7 +2,7 @@
 import { db } from '../config/firestore';
 import { randomUUID } from 'crypto';
 import { generateGameCode } from '../utils/generateGameCode';
-import { generateRanking } from './ranking.service';
+import { RankingGenerationResult, generateRanking } from './ranking.service';
 import { normalize, findRankingItem } from './matching';
 import {
   ThemeBank,
@@ -20,6 +20,7 @@ export const DEFAULT_MAX_ROUNDS = 5;
 export const DEFAULT_ROUND_TIME_LIMIT_SECONDS = 30;
 const MAX_PLAYERS = 5;
 const ENABLE_AI_FALLBACK = process.env.ENABLE_AI_FALLBACK === 'true';
+const STRONG_MATCH_SCORE = 0.85;
 
 export class ThemeNotFoundError extends Error {
   constructor(readonly suggestions: ThemeSummary[]) {
@@ -43,7 +44,7 @@ type ResolvedGameTheme = {
   title: string;
   themeId: string | null;
   ranking: { position: number; value: string; aliases?: string[] }[];
-  source: 'bank' | 'groq' | 'openrouter';
+  source: 'bank' | RankingGenerationResult['source'];
   warning: string | null;
 };
 
@@ -83,7 +84,10 @@ async function resolveGameTheme(input: ThemeSelection): Promise<ResolvedGameThem
   const query = input.theme;
   if (!query) throw new Error('THEME_REQUIRED');
 
-  const match = resolveThemeByQuery(query);
+  // Com IA ligada, o banco só responde quando o casamento é forte; o resto vai pro Gemini (ADR-0003).
+  const match = resolveThemeByQuery(query, {
+    minScore: ENABLE_AI_FALLBACK ? STRONG_MATCH_SCORE : undefined,
+  });
   if (match.matched) {
     return {
       title: match.theme.title,

@@ -12,7 +12,7 @@ top-100-game/
 │     ├─ controllers/games.controller.ts  # HTTP: validação de entrada, códigos de erro
 │     ├─ services/games.service.ts   # REGRAS DA PARTIDA: criar, entrar, iniciar, responder, avançar
 │     ├─ services/themes.service.ts  # banco de temas: lista, busca por id/aleatório, matching por título (ADR-0001)
-│     ├─ services/ranking.service.ts # geração de ranking via Groq/OpenRouter — fallback OPCIONAL atrás de `ENABLE_AI_FALLBACK` (default off)
+│     ├─ services/ranking.service.ts # geração de ranking por IA para tema livre: Gemini → Groq → OpenRouter, atrás de `ENABLE_AI_FALLBACK` (ADR-0003)
 │     ├─ utils/generateGameCode.ts   # código de sala (6 chars)
 │     └─ utils/normalize.ts          # normalização de texto p/ matching (DOMAIN §4)
 │  └─ scripts/copy-themes.js         # build copia data/themes/ p/ lib/data/themes (deploy só empacota functions/)
@@ -45,7 +45,7 @@ top-100-game/
 | Tarefa | Arquivos |
 |---|---|
 | Regra da partida (pontuação, rodadas, empate) | `functions/src/services/games.service.ts` (+ `docs/DOMAIN.md`) |
-| Origem/matching do ranking e temas | `functions/src/services/themes.service.ts`, `data/themes/` (banco, ADR-0001); `ranking.service.ts` só se `ENABLE_AI_FALLBACK=true` |
+| Origem/matching do ranking e temas | `functions/src/services/themes.service.ts`, `data/themes/` (banco, ADR-0001); `ranking.service.ts` só se `ENABLE_AI_FALLBACK=true` (tema livre sem casamento forte no banco, ADR-0003) |
 | Nova rota / código de erro HTTP | `functions/src/routes/games.routes.ts` + `controllers/games.controller.ts` (rotas `/games/*`); rotas soltas (ex.: `/themes`) são montadas direto em `index.ts` |
 | O que a API expõe ao cliente | `controllers/games.controller.ts` (sanitização, ADR-0002) |
 | Tela Home / criação de sala | `web/app/page.tsx`, `web/services/api.ts` |
