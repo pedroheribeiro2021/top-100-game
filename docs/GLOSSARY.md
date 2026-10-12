@@ -16,4 +16,4 @@
 | **Morte súbita** | Rodada extra de desempate entre líderes empatados. |
 | **Banco de temas** | `data/themes/*.json` — temas pré-gerados e curados; fonte única de rankings (ADR-0001). |
 | **Tema aleatório** | Sorteio de um tema do banco na criação da sala. |
-| **Fallback de IA** | Provedores gratuitos (Groq/OpenRouter) usados só se o tema não existe no banco; nunca com custo. |
+| **Fallback de IA** | Provedores gratuitos (Gemini, com Groq/OpenRouter de reserva) que geram o ranking de um tema livre sem casamento forte no banco (ADR-0003); nunca com custo. |

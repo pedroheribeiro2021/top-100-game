@@ -5,7 +5,7 @@ type RankingItem = {
 
 export type RankingGenerationResult = {
   ranking: RankingItem[];
-  source: 'groq' | 'openrouter';
+  source: ProviderConfig['name'];
   warning: string | null;
 };
 
@@ -15,11 +15,14 @@ type ProviderResult = {
 };
 
 type ProviderConfig = {
-  name: 'groq' | 'openrouter';
+  name: 'gemini' | 'groq' | 'openrouter';
   model: string;
   apiKey: string | undefined;
   endpoint: string;
   headers?: Record<string, string>;
+  // Modelos com raciocínio (Gemini) gastam tokens antes da resposta.
+  maxTokens?: number;
+  extraBody?: Record<string, unknown>;
 };
 
 type ProviderHealth = {
@@ -34,8 +37,19 @@ type ProviderHealth = {
 function getProviderConfigs(): ProviderConfig[] {
   const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
   const openRouterModel = process.env.OPENROUTER_MODEL || 'openrouter/free';
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 
   return [
+    {
+      // Endpoint compatível com OpenAI do Gemini (free tier do Google AI Studio).
+      name: 'gemini',
+      model: geminiModel,
+      apiKey: process.env.GEMINI_API_KEY,
+      endpoint:
+        'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+      maxTokens: 8192,
+      extraBody: { reasoning_effort: 'low' },
+    },
     {
       name: 'groq',
       model: groqModel,
@@ -302,7 +316,8 @@ async function generateWithProvider(
         model: provider.model,
         messages: buildMessages(theme, items),
         temperature: attempt === 0 ? 0.3 : 0.5,
-        max_tokens: getMaxTokens(items),
+        max_tokens: provider.maxTokens ?? getMaxTokens(items),
+        ...provider.extraBody,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(
@@ -360,7 +375,8 @@ async function probeProvider(
           },
         ],
         temperature: 0.1,
-        max_tokens: 8,
+        max_tokens: provider.maxTokens ?? 8,
+        ...provider.extraBody,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(

@@ -33,7 +33,7 @@ export type ThemeMatchResult =
 // Aceita um match sem o usuário precisar digitar o título inteiro,
 // mas evita casar temas sem relação nenhuma com a busca.
 const MATCH_SCORE_THRESHOLD = 0.55;
-const SUGGESTION_LIMIT = 3;
+const SUGGESTION_LIMIT = 5;
 
 let cachedIndex: ThemeIndexEntry[] | null = null;
 const themeCache = new Map<string, ThemeBank>();
@@ -101,17 +101,64 @@ function levenshteinDistance(a: string, b: string): number {
   return distances[rows - 1][cols - 1];
 }
 
-function similarityScore(normalizedQuery: string, normalizedTitle: string): number {
-  if (!normalizedQuery || !normalizedTitle) return 0;
-  if (normalizedQuery === normalizedTitle) return 1;
-  if (normalizedTitle.includes(normalizedQuery) || normalizedQuery.includes(normalizedTitle)) {
+// Palavras que não distinguem um tema de outro ("top 100 ... de ...").
+const STOPWORDS = new Set([
+  'top', '100', 'de', 'do', 'da', 'dos', 'das', 'e', 'o', 'a', 'os', 'as',
+  'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'com', 'por', 'para', 'the',
+  'todos', 'tempos', 'lista', 'ranking',
+]);
+
+// Qualificadores contam pouco: "melhores séries" deve casar com "séries mais famosas".
+const SOFT_WORDS = new Set([
+  'mais', 'melhores', 'melhor', 'famosos', 'famosas', 'famoso', 'famosa',
+  'conhecidos', 'conhecidas', 'populares', 'popular', 'maiores', 'maior',
+  'grandes', 'principais', 'classicos', 'classicas',
+]);
+const SOFT_WEIGHT = 0.3;
+
+// Buscas com pontuações quase iguais são ambíguas ("filmes"): o jogador escolhe.
+const AMBIGUITY_MARGIN = 0.05;
+
+function tokenize(normalized: string): string[] {
+  return normalized
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token && !STOPWORDS.has(token));
+}
+
+function tokenSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  // Singular/plural e palavras incompletas: "filme" ~ "filmes", "pokemon" ~ "pokemons".
+  if (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a))) {
     return 0.9;
   }
 
-  const distance = levenshteinDistance(normalizedQuery, normalizedTitle);
-  const maxLength = Math.max(normalizedQuery.length, normalizedTitle.length) || 1;
+  const maxLength = Math.max(a.length, b.length);
+  if (maxLength < 5) return 0;
 
-  return 1 - distance / maxLength;
+  const score = 1 - levenshteinDistance(a, b) / maxLength;
+  return score >= 0.75 ? score : 0;
+}
+
+function similarityScore(normalizedQuery: string, entry: ThemeIndexEntry): number {
+  const normalizedTitle = normalizeText(entry.title);
+  if (!normalizedQuery) return 0;
+  if (normalizedQuery === normalizedTitle) return 1;
+
+  const queryTokens = tokenize(normalizedQuery);
+  const themeTokens = tokenize(`${normalizedTitle} ${normalizeText(entry.category)}`);
+  if (queryTokens.length === 0 || themeTokens.length === 0) return 0;
+
+  let total = 0;
+  let weights = 0;
+  for (const queryToken of queryTokens) {
+    const weight = SOFT_WORDS.has(queryToken) ? SOFT_WEIGHT : 1;
+    const best = Math.max(...themeTokens.map((token) => tokenSimilarity(queryToken, token)));
+    total += best * weight;
+    weights += weight;
+  }
+
+  return total / weights;
 }
 
 export function listThemes(): ThemeSummary[] {
@@ -132,25 +179,31 @@ export function getRandomTheme(): ThemeBank {
   return loadThemeFile(entry);
 }
 
-export function resolveThemeByQuery(query: string): ThemeMatchResult {
+export function resolveThemeByQuery(
+  query: string,
+  options: { minScore?: number } = {},
+): ThemeMatchResult {
+  const minScore = options.minScore ?? MATCH_SCORE_THRESHOLD;
   const index = loadIndex();
   const normalizedQuery = normalizeText(query);
 
   const scored = index
     .map((entry) => ({
       entry,
-      score: similarityScore(normalizedQuery, normalizeText(entry.title)),
+      score: similarityScore(normalizedQuery, entry),
     }))
     .sort((a, b) => b.score - a.score);
 
-  const best = scored[0];
-  if (best && best.score >= MATCH_SCORE_THRESHOLD) {
+  const [best, second] = scored;
+  const ambiguous = !!second && best.score - second.score < AMBIGUITY_MARGIN;
+  if (best && best.score >= minScore && !ambiguous) {
     return { matched: true, theme: loadThemeFile(best.entry) };
   }
 
   return {
     matched: false,
     suggestions: scored
+      .filter(({ score }) => score > 0)
       .slice(0, SUGGESTION_LIMIT)
       .map(({ entry }) => ({ id: entry.id, title: entry.title, category: entry.category })),
   };

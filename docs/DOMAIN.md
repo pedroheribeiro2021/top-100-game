@@ -29,7 +29,8 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 
 ## §5 Temas e rankings (invariante — ADR-0001)
 - **Custo zero de IA em runtime.** Rankings vêm do banco local `data/themes/*.json` (100 itens + aliases, curados).
-- Tema digitado é casado com o banco por similaridade (normalização + fuzzy simples). Sem correspondência: oferecer temas próximos ou sorteio; provedores gratuitos (Groq/OpenRouter) são fallback **opcional** e nunca podem gerar custo.
+- Tema digitado é casado com o banco por similaridade (normalização + palavras, com fuzzy simples). Busca ambígua ou sem correspondência: oferecer temas próximos ou sorteio.
+- Tema livre por IA (ADR-0003): com `ENABLE_AI_FALLBACK=true`, tema sem casamento forte no banco é gerado pelo Gemini (free tier; Groq/OpenRouter de reserva). Nunca pode gerar custo.
 - Ordem dos itens é aproximada por natureza; a curadoria prioriza plausibilidade e diversão, não precisão estatística.
 
 ## §6 Fim de jogo e empate

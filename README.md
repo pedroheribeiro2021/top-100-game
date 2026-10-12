@@ -12,7 +12,7 @@ cp web/.env.example web/.env.local
 2. Preencha as variáveis:
 - `CORS_ORIGINS` em `functions/.env` (obrigatória, lista separada por vírgula)
 - Variáveis `NEXT_PUBLIC_*` em `web/.env.local`
-- O jogo funciona sem nenhuma chave de IA — os temas vêm do banco local em `data/themes/` (ADR-0001). `GROQ_API_KEY`/`OPENROUTER_API_KEY` em `functions/.env` são só um fallback opcional para temas fora do banco, ativado com `ENABLE_AI_FALLBACK=true`.
+- O jogo funciona sem nenhuma chave de IA — os temas vêm do banco local em `data/themes/` (ADR-0001). Para o tema livre por IA (ADR-0003), defina `ENABLE_AI_FALLBACK=true` e `GEMINI_API_KEY` (free tier do Google AI Studio) em `functions/.env`; `GROQ_API_KEY`/`OPENROUTER_API_KEY` são reserva.
 
 > Observação: o Firebase Emulator busca variáveis no escopo de `functions/.env` para Functions locais.
 

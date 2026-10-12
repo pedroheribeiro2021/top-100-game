@@ -20,7 +20,25 @@ const CATEGORY_LABELS: Record<string, string> = {
   negocios: "Negócios",
   natureza: "Natureza",
   gastronomia: "Gastronomia",
+  tv: "TV e séries",
+  games: "Games",
+  anime: "Anime",
+  "cultura-pop": "Cultura pop",
+  veiculos: "Veículos",
+  tecnologia: "Tecnologia",
+  historia: "História",
+  ciencia: "Ciência",
+  literatura: "Literatura",
+  cotidiano: "Cotidiano",
 };
+
+function normalizeSearch(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
 function categoryLabel(category: string): string {
   return (
@@ -61,12 +79,15 @@ export default function Home() {
   }, []);
 
   const filteredThemes = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return themes;
+    const words = normalizeSearch(query).split(/\s+/).filter(Boolean);
+    if (words.length === 0) return themes;
 
-    return themes.filter((theme) =>
-      theme.title.toLowerCase().includes(normalized),
-    );
+    return themes.filter((theme) => {
+      const haystack = normalizeSearch(
+        `${theme.title} ${categoryLabel(theme.category)}`,
+      );
+      return words.every((word) => haystack.includes(word));
+    });
   }, [themes, query]);
 
   const categories = useMemo(() => {
@@ -98,8 +119,10 @@ export default function Home() {
       localStorage.setItem("playerId", game.hostId);
       window.location.href = `/game/${game.gameCode}`;
     } catch (error: unknown) {
-      if (error instanceof CreateGameError && error.suggestions) {
+      // Tema sem correspondência: mostra as sugestões na tela em vez de um alerta.
+      if (error instanceof CreateGameError && error.suggestions?.length) {
         setSuggestions(error.suggestions);
+        return;
       }
 
       const message =
@@ -223,7 +246,7 @@ export default function Home() {
             </label>
             <input
               type="text"
-              placeholder="Ou digite um tema livre (ex: cidades, filmes...)"
+              placeholder="Ou peça qualquer tema à IA (ex: vilões da Marvel)"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="mt-1 w-full border-2 border-gray-900 p-2 font-mono"
@@ -246,7 +269,7 @@ export default function Home() {
               ))}
 
               {filteredThemes.length === 0 && (
-                <li className="text-sm text-gray-400">Nenhum tema encontrado no banco.</li>
+                <li className="text-sm text-gray-400">Nenhum tema pronto com esse nome — crie a sala e a IA gera o ranking.</li>
               )}
             </ul>
           ) : selectedCategory === null ? (
@@ -297,7 +320,7 @@ export default function Home() {
           {suggestions.length > 0 && (
             <div className="border-2 border-retro-yellow-dark bg-yellow-50 p-2 text-sm">
               <p className="mb-1 font-bold text-retro-yellow-dark">
-                Tema não encontrado. Que tal:
+                Não achamos esse tema exato. Que tal:
               </p>
               <ul className="space-y-1">
                 {suggestions.map((theme) => (

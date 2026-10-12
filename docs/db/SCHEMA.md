@@ -25,7 +25,7 @@ Documento por partida (id = UUID). Campos atuais:
 | `roundDeadlineAt` | timestamp \| null | expiração da rodada |
 | `winner` | Player \| null | definido em FINISHED |
 | `rematchGameId` | string \| null | id do novo jogo criado por "jogar novamente" (`POST /:id/rematch`); clientes que ainda pollam o jogo antigo seguem para ele |
-| `rankingSource` | string | `bank` (padrão, ADR-0001) \| `groq` \| `openrouter` (fallback opcional, só com `ENABLE_AI_FALLBACK=true`) |
+| `rankingSource` | string | `bank` (padrão, ADR-0001) \| `gemini` \| `groq` \| `openrouter` (IA para tema livre, só com `ENABLE_AI_FALLBACK=true`, ADR-0003) |
 | `createdAt` / `updatedAt` | timestamp | |
 
 Sem auth: o jogador guarda `playerId` no localStorage. Risco aceito para o escopo atual.
