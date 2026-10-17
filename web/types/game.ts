@@ -1,7 +1,12 @@
+export type BotLevel = "easy" | "medium" | "hard";
+
 export type Player = {
   id: string;
   name: string;
   score: number;
+  /** Bot controlado pelo servidor (DOMAIN §2, ADR-0004). */
+  isBot?: boolean;
+  botLevel?: BotLevel;
 };
 
 export type RankingItem = {

@@ -4,15 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import {
+  addBot,
   getGameByCode,
   getGameById,
   joinGame,
   rematchGame,
+  removeBot,
   setRoundPaused,
   startGame,
   submitAnswer,
 } from "@/services/api";
-import { Game, Player, RoundHistoryEntry } from "@/types/game";
+import { BotLevel, Game, Player, RoundHistoryEntry } from "@/types/game";
 import { useCurrentPlayer } from "@/hooks/useCurrentPlayer";
 import RetroButton from "@/components/RetroButton";
 import RetroCard from "@/components/RetroCard";
@@ -22,6 +24,16 @@ import RoundResultView from "@/components/RoundResultView";
 
 const GAME_POLL_INTERVAL_MS = 2000;
 const RANK_COLORS: RetroColor[] = ["pink", "yellow", "cyan"];
+const MAX_PLAYERS = 5;
+const BOT_LEVEL_OPTIONS: { level: BotLevel; label: string; variant: "outline" | "secondary" | "primary" }[] = [
+  { level: "easy", label: "Fácil", variant: "outline" },
+  { level: "medium", label: "Médio", variant: "secondary" },
+  { level: "hard", label: "Difícil", variant: "primary" },
+];
+
+function playerLabel(player: Player) {
+  return player.isBot ? `🤖 ${player.name}` : player.name;
+}
 
 export default function GamePage() {
   const params = useParams<{ code: string }>();
@@ -94,6 +106,34 @@ export default function GamePage() {
       const message =
         error instanceof Error ? error.message : "Erro ao entrar na sala";
       alert(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAddBot(level: BotLevel) {
+    if (!game || !currentPlayer) return;
+
+    try {
+      setLoading(true);
+      await addBot(game.id, currentPlayer.id, level);
+      await loadGame();
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Erro ao adicionar bot");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRemoveBot(botId: string) {
+    if (!game || !currentPlayer) return;
+
+    try {
+      setLoading(true);
+      await removeBot(game.id, currentPlayer.id, botId);
+      await loadGame();
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Erro ao remover bot");
     } finally {
       setLoading(false);
     }
@@ -274,14 +314,51 @@ export default function GamePage() {
                   }`}
                 >
                   <span>
-                    {player.name}
+                    {playerLabel(player)}
                     {player.id === game.hostId && " 👑"}
                   </span>
-                  <span>{player.score} pts</span>
+                  {isHost && player.isBot ? (
+                    <button
+                      onClick={() => handleRemoveBot(player.id)}
+                      disabled={loading}
+                      className="text-xs font-bold text-retro-red-dark uppercase hover:underline"
+                    >
+                      Remover
+                    </button>
+                  ) : (
+                    <span>{player.score} pts</span>
+                  )}
                 </li>
               ))}
             </ul>
           </RetroCard>
+
+          {isHost && game.players.length < MAX_PLAYERS && (
+            <RetroCard color="cyan" className="space-y-2">
+              <p className="text-xs font-bold tracking-wide text-gray-500 uppercase">
+                Adicionar bot
+              </p>
+              <p className="text-sm text-gray-600">
+                {game.players.length < 2
+                  ? "Sozinho? Jogue contra um bot."
+                  : "Complete a sala com bots."}{" "}
+                Fácil chuta os óbvios; difícil vai fundo no ranking.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {BOT_LEVEL_OPTIONS.map((option) => (
+                  <RetroButton
+                    key={option.level}
+                    variant={option.variant}
+                    onClick={() => handleAddBot(option.level)}
+                    disabled={loading}
+                    className="flex-1 px-3 py-1 text-xs"
+                  >
+                    🤖 {option.label}
+                  </RetroButton>
+                ))}
+              </div>
+            </RetroCard>
+          )}
 
           {isHost && (
             <RetroButton
@@ -537,7 +614,7 @@ function RoundSection({
             .map((player, index) => (
               <li key={player.id} className="flex items-center gap-2">
                 <Chip color={RANK_COLORS[index] || "cyan"}>{index + 1}</Chip>
-                <span className="flex-1 font-semibold text-gray-800">{player.name}</span>
+                <span className="flex-1 font-semibold text-gray-800">{playerLabel(player)}</span>
                 <span className="font-bold text-gray-900">{player.score} pts</span>
               </li>
             ))}
