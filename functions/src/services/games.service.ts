@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { db } from '../config/firestore';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { generateGameCode } from '../utils/generateGameCode';
 import { RankingGenerationResult, generateRanking } from './ranking.service';
 import { normalize, findRankingItem } from './matching';
@@ -61,6 +61,50 @@ function toRankingItems(theme: ThemeBank) {
   }));
 }
 
+/**
+ * Cache dos rankings gerados por IA (ADR-0003), por tema normalizado: o mesmo
+ * tema livre reaproveita o ranking em vez de gastar cota e sair diferente.
+ * Coleção separada de `games`, nunca exposta ao cliente (ADR-0002).
+ */
+const GENERATED_RANKINGS_COLLECTION = 'generatedRankings';
+
+function generatedRankingDocId(theme: string) {
+  return createHash('sha1').update(normalize(theme)).digest('hex');
+}
+
+async function getOrGenerateRanking(theme: string): Promise<RankingGenerationResult> {
+  const docRef = db
+    .collection(GENERATED_RANKINGS_COLLECTION)
+    .doc(generatedRankingDocId(theme));
+
+  try {
+    const cached = await docRef.get();
+    const data = cached.exists ? cached.data() : null;
+    if (data && Array.isArray(data.ranking) && data.ranking.length > 0) {
+      return { ranking: data.ranking, source: data.source, warning: data.warning ?? null };
+    }
+  } catch (error) {
+    console.error('Generated ranking cache read failed', error);
+  }
+
+  const result = await generateRanking(theme);
+
+  try {
+    await docRef.set({
+      theme: theme.trim(),
+      normalizedTheme: normalize(theme),
+      ranking: result.ranking,
+      source: result.source,
+      warning: result.warning,
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    console.error('Generated ranking cache write failed', error);
+  }
+
+  return result;
+}
+
 async function resolveGameTheme(input: ThemeSelection): Promise<ResolvedGameTheme> {
   if (input.random) {
     const theme = getRandomTheme();
@@ -104,9 +148,9 @@ async function resolveGameTheme(input: ThemeSelection): Promise<ResolvedGameThem
   }
 
   if (ENABLE_AI_FALLBACK) {
-    const aiResult = await generateRanking(query);
+    const aiResult = await getOrGenerateRanking(query);
     return {
-      title: query,
+      title: query.trim(),
       themeId: null,
       ranking: aiResult.ranking,
       source: aiResult.source,

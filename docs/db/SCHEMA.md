@@ -31,6 +31,18 @@ Documento por partida (id = UUID). Campos atuais:
 
 Sem auth: o jogador guarda `playerId` no localStorage. Risco aceito para o escopo atual.
 
+## Firestore — coleção `generatedRankings`
+Cache dos rankings gerados por IA (ADR-0003). Id = sha1 do tema normalizado. Só o servidor lê/escreve; nunca vai ao cliente (ADR-0002).
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `theme` | string | tema como foi digitado na primeira geração |
+| `normalizedTheme` | string | chave legível (o id é o hash dela) |
+| `ranking` | `{position, value, aliases?}[]` | 30 a 100 itens |
+| `source` | `gemini` \| `groq` \| `openrouter` | provedor que gerou |
+| `warning` | string \| null | modelo usado |
+| `createdAt` | timestamp | |
+
 ## Banco de temas — `data/themes/`
 - `index.json`: manifesto `[{id, title, category, file}]` — o que o app lê para listar/sortear.
 - `<id>.json`: um tema por arquivo:

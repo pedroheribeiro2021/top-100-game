@@ -12,7 +12,7 @@ top-100-game/
 │     ├─ controllers/games.controller.ts  # HTTP: validação de entrada, códigos de erro
 │     ├─ services/games.service.ts   # REGRAS DA PARTIDA: criar, entrar, iniciar, responder, avançar
 │     ├─ services/themes.service.ts  # banco de temas: lista, busca por id/aleatório, matching por título (ADR-0001)
-│     ├─ services/ranking.service.ts # geração de ranking por IA para tema livre: Gemini → Groq → OpenRouter, atrás de `ENABLE_AI_FALLBACK` (ADR-0003)
+│     ├─ services/ranking.service.ts # geração de ranking por IA para tema livre: Gemini → Groq → OpenRouter, atrás de `ENABLE_AI_FALLBACK` (ADR-0003); JSON com aliases, tema pequeno ≥ 30 itens; cache em `generatedRankings` fica em `games.service`
 │     ├─ utils/generateGameCode.ts   # código de sala (6 chars)
 │     └─ utils/normalize.ts          # normalização de texto p/ matching (DOMAIN §4)
 │  └─ scripts/copy-themes.js         # build copia data/themes/ p/ lib/data/themes (deploy só empacota functions/)

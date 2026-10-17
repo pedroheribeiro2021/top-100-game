@@ -1,5 +1,11 @@
 # Registro de sessões
 
+## 2026-10-16 — Tema livre por IA: completar a feature
+- **Diagnóstico:** `/health/providers` em staging → Gemini configurado com `gemini-2.0-flash-lite` respondendo 404; sem Groq/OpenRouter. Todo tema livre virava 503.
+- **Alterações:** `ranking.service.ts` (prompt JSON com aliases, sanitização de parênteses, dedupe de aliases ambíguos, tema pequeno ≥ 30 itens, mensagem de erro do Gemini em array); `games.service.ts` (cache `generatedRankings`); controller (503 com sugestões do banco); Home (aviso "montando o ranking", erro inline com temas parecidos); tela final mostra "Top N".
+- **Decisões:** opção (a) para tema pequeno (ranking menor, mínimo 30); atualização do ADR-0003.
+- **Testes:** geração simulada (fetch falso): aliases, parênteses, alias ambíguo, continuação, cache, tema pequeno, falha 404; build/lint web e functions.
+
 ## 2026-10-16 — Ajustes de partida (matching, repetição, categorias, pausa)
 - **Objetivo:** aceitar "he man" para "He-Man"; mesmo item na mesma rodada pontuar para todos; categorias no estilo do app; pausar o cronômetro.
 - **Alterações:** `matching.ts` (pontuação interna vira espaço; comparação sem espaços); `games.service.ts` (item repetido na mesma rodada pontua; `setRoundPaused` + campo `roundPausedRemainingMs`; expiração lazy ignora rodada pausada; `ROUND_PAUSED`); rotas `POST /games/:id/pause|resume`; `web/app/page.tsx` (blocos de categoria retrô com ícones, linhas de tema); `web/app/game/[code]/page.tsx` (botão PAUSAR/RETOMAR do host, faixa de pausado); textos de regra no rodapé e onboarding.
