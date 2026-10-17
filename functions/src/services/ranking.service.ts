@@ -105,7 +105,7 @@ const SYSTEM_PROMPT = [
   'Voce gera rankings para um jogo multiplayer em portugues do Brasil, em que os jogadores tentam adivinhar os itens digitando.',
   'Responda SOMENTE com JSON valido, sem markdown e sem comentarios, no formato:',
   '{"items":[{"value":"Nome do item","aliases":["outra grafia","apelido"]}]}',
-  'Regras para "value": o nome mais comum em portugues do Brasil; curto; sem ano, pais, descricao ou detalhe entre parenteses; sem numeracao.',
+  'Regras para "value": o nome mais comum em portugues do Brasil; curto; sem ano, pais, descricao ou detalhe entre parenteses; sem numeracao; com a acentuacao correta do portugues (ex.: "Getúlio Vargas", "São Paulo").',
   'Regras para "aliases": de 0 a 4 outras formas que um jogador digitaria para o mesmo item (sobrenome sozinho de pessoa famosa, sigla, nome original em ingles, apelido conhecido). Nunca um alias que sirva para outro item da lista.',
   'Itens unicos, ordenados do mais popular/obvio para o menos popular/obscuro.',
   `Se o tema tiver menos de ${MAX_RANKING_ITEMS} itens que existem de verdade, liste todos os que existem e pare; nunca invente nem repita itens.`,
