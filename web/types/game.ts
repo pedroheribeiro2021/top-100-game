@@ -43,7 +43,8 @@ export type Game = {
   players: Player[];
   /** Só vem preenchido quando status === "FINISHED" (ADR-0002). */
   ranking?: RankingItem[];
-  currentRoundAnswers: RoundAnswer[];
+  /** Durante a partida a API só envia `playerId` (quem já respondeu); o resto vem no roundHistory. */
+  currentRoundAnswers: (Pick<RoundAnswer, "playerId"> & Partial<RoundAnswer>)[];
   roundHistory?: RoundHistoryEntry[];
   roundDeadlineAt?: string | null;
   /** Tempo restante (ms) congelado enquanto o host pausa a rodada; null = rodando. */

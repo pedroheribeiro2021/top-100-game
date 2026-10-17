@@ -19,6 +19,7 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 - Fase ANSWERING: todos palpitam dentro do tempo. 1 palpite por jogador por rodada.
 - Rodada fecha quando **todos responderam** ou o **tempo expira** (quem não respondeu marca 0).
 - **Pausa**: o host pode pausar e retomar o cronômetro durante ANSWERING. Pausado, o tempo restante fica congelado e palpites são recusados; ao retomar, o prazo é recalculado a partir do tempo que sobrou.
+- Durante ANSWERING, ninguém vê o palpite nem os pontos dos outros — só **quem já respondeu** (nem a API envia).
 - Fase RESULT (revelação): mostra o palpite de cada jogador, acerto/erro, posição no ranking e pontos.
 - Depois da revelação: próxima rodada, ou verificação de fim (§6).
 
