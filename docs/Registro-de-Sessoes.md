@@ -3,6 +3,7 @@
 ## 2026-10-16 — Tema livre por IA: completar a feature
 - **Diagnóstico:** `/health/providers` em staging → Gemini configurado com `gemini-2.0-flash-lite` respondendo 404; sem Groq/OpenRouter. Todo tema livre virava 503.
 - **Alterações:** `ranking.service.ts` (prompt JSON com aliases, sanitização de parênteses, dedupe de aliases ambíguos, tema pequeno ≥ 30 itens, mensagem de erro do Gemini em array); `games.service.ts` (cache `generatedRankings`); controller (503 com sugestões do banco); Home (aviso "montando o ranking", erro inline com temas parecidos); tela final mostra "Top N".
+- **Render (staging):** removido `GEMINI_MODEL`, adicionado `ENABLE_AI_FALLBACK=true` (não existia); `/health/providers` → Gemini `gemini-flash-latest` ok. A chave do Gemini já existia — chave do AI Studio não é presa a modelo.
 - **Decisões:** opção (a) para tema pequeno (ranking menor, mínimo 30); atualização do ADR-0003.
 - **Testes:** geração simulada (fetch falso): aliases, parênteses, alias ambíguo, continuação, cache, tema pequeno, falha 404; build/lint web e functions.
 
