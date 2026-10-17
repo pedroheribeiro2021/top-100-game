@@ -30,7 +30,20 @@ function toPublicGame(game: any) {
 
   // usedItems guarda valores normalizados do ranking — também precisa ficar oculto.
   const { ranking, usedItems, ...publicGame } = game;
-  return { ...publicGame, rankingSize };
+  return {
+    ...publicGame,
+    rankingSize,
+    currentRoundAnswers: toPublicRoundAnswers(game.currentRoundAnswers),
+  };
+}
+
+/**
+ * Durante a rodada, palpite e pontos dos outros jogadores ficam ocultos
+ * (DOMAIN §3): o cliente só sabe quem já respondeu. Tudo aparece na
+ * revelação, via roundHistory.
+ */
+function toPublicRoundAnswers(answers: any[] | undefined) {
+  return (answers || []).map((a: any) => ({ playerId: a.playerId }));
 }
 
 export async function createGameHandler(req: Request, res: Response) {
@@ -232,7 +245,8 @@ export async function submitAnswerHandler(req: Request, res: Response) {
 
     const result = await submitAnswer(id, playerId, answer);
 
-    return res.status(200).json(result);
+    // Acerto e pontos só aparecem na revelação da rodada (DOMAIN §3).
+    return res.status(200).json({ playerId: result.playerId, answer: result.answer });
   } catch (error: any) {
     if (error.message === 'ROUND_EXPIRED') {
       return res.status(400).json({ error: 'Tempo da rodada esgotado' });

@@ -18,7 +18,7 @@ Documento por partida (id = UUID). Campos atuais:
 | `ranking` | `{position, value, aliases?}[]` | **secreto** — nunca sai na API antes de FINISHED (ADR-0002) |
 | `currentRound` / `maxRounds` | number | `maxRounds` ∈ {3,5,7,10}, padrão 5; `currentRound` continua subindo além de `maxRounds` durante SUDDEN_DEATH |
 | `roundTimeLimit` | number (s) | ∈ {15,30,45,60}, padrão 30 |
-| `currentRoundAnswers` | `{playerId, answer, points, alreadyUsed}[]` | limpo a cada rodada |
+| `currentRoundAnswers` | `{playerId, answer, points, alreadyUsed}[]` | limpo a cada rodada; a API só expõe `{playerId}` enquanto a partida não termina (DOMAIN §3) |
 | `usedItems` | string[] | valores normalizados já pontuados; nunca sai na API antes de FINISHED (ADR-0002) |
 | `tiedPlayerIds` | string[] | ids empatados na liderança durante `SUDDEN_DEATH` (DOMAIN §6); só eles podem responder |
 | `roundHistory` | `{round, answers, ranking}[]` | `ranking` = placar dos jogadores |
