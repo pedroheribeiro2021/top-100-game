@@ -34,6 +34,9 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 - **Custo zero de IA em runtime.** Rankings vêm do banco local `data/themes/*.json` (100 itens + aliases, curados).
 - Tema digitado é casado com o banco por similaridade (normalização + palavras, com fuzzy simples). Busca ambígua ou sem correspondência: oferecer temas próximos ou sorteio.
 - Tema livre por IA (ADR-0003): com `ENABLE_AI_FALLBACK=true`, tema sem casamento forte no banco é gerado pelo Gemini (free tier; Groq/OpenRouter de reserva). Nunca pode gerar custo.
+  - A IA gera também os `aliases` de cada item (sobrenome, sigla, nome em inglês) e devolve o nome sem detalhes entre parênteses.
+  - **Tema pequeno**: se o assunto não tem 100 itens reais ("planetas", "estados do Brasil"), o ranking gerado fica menor — mínimo de **30 itens**; abaixo disso, a geração falha. Pontos continuam = posição.
+  - O ranking gerado é guardado por tema normalizado e reaproveitado quando o mesmo tema livre é pedido de novo.
 - Ordem dos itens é aproximada por natureza; a curadoria prioriza plausibilidade e diversão, não precisão estatística.
 
 ## §6 Fim de jogo e empate

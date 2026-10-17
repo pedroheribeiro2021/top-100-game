@@ -1,7 +1,21 @@
 type RankingItem = {
   position: number;
   value: string;
+  aliases?: string[];
 };
+
+type GeneratedItem = {
+  value: string;
+  aliases: string[];
+};
+
+/**
+ * DOMAIN §5: tema com menos de 100 itens existentes ("planetas", "estados do
+ * Brasil") vira ranking menor, desde que tenha pelo menos isto.
+ */
+export const MIN_AI_RANKING_ITEMS = 30;
+const MAX_RANKING_ITEMS = 100;
+const MAX_ALIASES_PER_ITEM = 4;
 
 export type RankingGenerationResult = {
   ranking: RankingItem[];
@@ -85,64 +99,48 @@ export class RankingGenerationError extends Error {
   }
 }
 
-function buildMessages(theme: string, existingItems: string[] = []) {
-  const remainingItems = 100 - existingItems.length;
+// Jogadores digitam os palpites: o item precisa ser o nome que alguém
+// escreveria, e os aliases cobrem as outras grafias comuns (DOMAIN §4).
+const SYSTEM_PROMPT = [
+  'Voce gera rankings para um jogo multiplayer em portugues do Brasil, em que os jogadores tentam adivinhar os itens digitando.',
+  'Responda SOMENTE com JSON valido, sem markdown e sem comentarios, no formato:',
+  '{"items":[{"value":"Nome do item","aliases":["outra grafia","apelido"]}]}',
+  'Regras para "value": o nome mais comum em portugues do Brasil; curto; sem ano, pais, descricao ou detalhe entre parenteses; sem numeracao.',
+  'Regras para "aliases": de 0 a 4 outras formas que um jogador digitaria para o mesmo item (sobrenome sozinho de pessoa famosa, sigla, nome original em ingles, apelido conhecido). Nunca um alias que sirva para outro item da lista.',
+  'Itens unicos, ordenados do mais popular/obvio para o menos popular/obscuro.',
+  `Se o tema tiver menos de ${MAX_RANKING_ITEMS} itens que existem de verdade, liste todos os que existem e pare; nunca invente nem repita itens.`,
+].join(' ');
 
+function buildMessages(theme: string, existingItems: string[] = []) {
   if (existingItems.length === 0) {
     return [
-      {
-        role: 'system',
-        content: [
-          'Voce gera rankings para um jogo multiplayer.',
-          'Responda somente com os itens do ranking.',
-          'Sem markdown, sem comentarios e sem introducao.',
-          'Entregue exatamente 100 itens, um por linha.',
-          'Os itens devem ser curtos, claros e unicos.',
-          'Ordene do mais popular/relevante para o menos popular/relevante.',
-        ].join(' '),
-      },
+      { role: 'system', content: SYSTEM_PROMPT },
       {
         role: 'user',
-        content: [
-          `Tema: ${theme}`,
-          'Gere um top 100 para esse tema.',
-          'Cada item deve ocupar uma linha separada.',
-          'Nao use numeracao obrigatoriamente, mas pode usar se quiser.',
-          'Nao escreva explicacoes.',
-        ].join('\n'),
+        content: `Tema: ${theme}\nGere o ranking com ate ${MAX_RANKING_ITEMS} itens.`,
       },
     ];
   }
 
   return [
-    {
-      role: 'system',
-      content: [
-        'Voce gera rankings para um jogo multiplayer.',
-        'Responda somente com os itens faltantes, um por linha.',
-        'Sem markdown, sem comentarios, sem repetir itens ja usados.',
-        'Nao reinicie o ranking do zero.',
-        'Ordene do mais popular/relevante para o menos popular/relevante.',
-      ].join(' '),
-    },
+    { role: 'system', content: SYSTEM_PROMPT },
     {
       role: 'user',
       content: [
         `Tema: ${theme}`,
         `Ja temos estes ${existingItems.length} itens:`,
         existingItems.map((item, index) => `${index + 1}. ${item}`).join('\n'),
-        `Continue a lista a partir do item ${existingItems.length + 1} ate o item 100.`,
-        `Entregue exatamente ${remainingItems} itens faltantes, um por linha.`,
-        'Nao repita nenhum item acima.',
+        `Continue a partir do item ${existingItems.length + 1}, ate no maximo o item ${MAX_RANKING_ITEMS}, sem repetir nenhum item acima.`,
+        'Se nao existirem mais itens de verdade para esse tema, responda {"items":[]}.',
       ].join('\n'),
     },
   ];
 }
 
+// JSON com aliases ocupa bem mais tokens que a lista simples de antes.
 function getMaxTokens(existingItems: string[]) {
-  if (existingItems.length === 0) return 900;
-  if (existingItems.length < 60) return 700;
-  return 500;
+  if (existingItems.length === 0) return 6000;
+  return 4000;
 }
 
 async function postJson(
@@ -189,7 +187,11 @@ function safeJsonParse(rawText: string): Record<string, unknown> {
   }
 }
 
-function extractProviderErrorMessage(data: Record<string, unknown>) {
+function extractProviderErrorMessage(data: unknown): string | null {
+  // O endpoint compatível do Gemini às vezes devolve o erro dentro de um array.
+  if (Array.isArray(data)) return extractProviderErrorMessage(data[0]);
+  if (!data || typeof data !== 'object' || !('error' in data)) return null;
+
   const error = data.error;
   if (!error || typeof error !== 'object') return null;
 
@@ -247,57 +249,96 @@ function extractItemsFromJson(text: string) {
   return null;
 }
 
-function tryParseItems(jsonText: string) {
+function tryParseItems(jsonText: string): GeneratedItem[] | null {
   try {
     const parsed = JSON.parse(jsonText) as { items?: unknown };
     if (!Array.isArray(parsed.items)) return null;
 
     return parsed.items
-      .filter((item): item is string => typeof item === 'string')
-      .map((item) => sanitizeItem(item))
-      .filter(Boolean);
+      .map((item: unknown): GeneratedItem | null => {
+        // Aceita {"value","aliases"} e também string solta.
+        if (typeof item === 'string') {
+          return { value: sanitizeItem(item), aliases: [] };
+        }
+        if (!item || typeof item !== 'object') return null;
+        if (!('value' in item) || typeof item.value !== 'string') return null;
+
+        const aliases =
+          'aliases' in item && Array.isArray(item.aliases)
+            ? item.aliases.filter((a: unknown): a is string => typeof a === 'string')
+            : [];
+
+        return {
+          value: sanitizeItem(item.value),
+          aliases: aliases.map(sanitizeItem).filter(Boolean),
+        };
+      })
+      .filter((item): item is GeneratedItem => item !== null && !!item.value);
   } catch {
     return null;
   }
 }
 
-function extractItemsFromLines(text: string) {
+function extractItemsFromLines(text: string): GeneratedItem[] {
   return text
     .split('\n')
     .map((line) => line.replace(/^\s*\d+[.)-]?\s*/, '').trim())
-    .map((line) => sanitizeItem(line))
-    .filter(Boolean);
+    .map((line) => ({ value: sanitizeItem(line), aliases: [] }))
+    .filter((item) => !!item.value && !/[{}[\]]/.test(item.value));
 }
 
+/** Tira aspas/marcadores das bordas e detalhes entre parênteses ("Titanic (1997)"). */
 function sanitizeItem(value: string) {
   return value
+    .replace(/\s*\([^)]*\)/g, '')
     .replace(/^["'\-•\s]+/, '')
     .replace(/["'\s]+$/, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-function dedupeItems(items: string[]) {
-  const seen = new Set<string>();
-  const result: string[] = [];
-
-  for (const item of items) {
-    const key = item.toLocaleLowerCase('pt-BR');
-    if (!key) continue;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(item);
-  }
-
-  return result;
+function itemKey(value: string) {
+  return value.toLocaleLowerCase('pt-BR');
 }
 
-function buildRankingFromText(text: string) {
-  const jsonItems = extractItemsFromJson(text);
-  const fallbackItems = extractItemsFromLines(text);
-  const items = dedupeItems(
-    jsonItems && jsonItems.length > 0 ? jsonItems : fallbackItems,
+/**
+ * Remove itens repetidos e aliases que repetem um item ou que aparecem em
+ * mais de um item — um palpite nunca pode casar com dois itens.
+ */
+function dedupeItems(items: GeneratedItem[]): GeneratedItem[] {
+  const valueKeys = new Set<string>();
+  const unique: GeneratedItem[] = [];
+
+  for (const item of items) {
+    const key = itemKey(item.value);
+    if (!key || valueKeys.has(key)) continue;
+    valueKeys.add(key);
+    unique.push(item);
+  }
+
+  const aliasOwners = new Map<string, number>();
+  unique.forEach((item) =>
+    new Set(item.aliases.map(itemKey)).forEach((key) =>
+      aliasOwners.set(key, (aliasOwners.get(key) ?? 0) + 1),
+    ),
   );
-  return items.slice(0, 100);
+
+  return unique.map((item) => {
+    const aliases = item.aliases.filter((alias) => {
+      const key = itemKey(alias);
+      return !valueKeys.has(key) && aliasOwners.get(key) === 1;
+    });
+
+    return {
+      value: item.value,
+      aliases: Array.from(new Set(aliases)).slice(0, MAX_ALIASES_PER_ITEM),
+    };
+  });
+}
+
+function buildRankingFromText(text: string): GeneratedItem[] {
+  const items = extractItemsFromJson(text) ?? extractItemsFromLines(text);
+  return dedupeItems(items).slice(0, MAX_RANKING_ITEMS);
 }
 
 async function generateWithProvider(
@@ -308,15 +349,16 @@ async function generateWithProvider(
     throw new Error(`${provider.name.toUpperCase()}_API_KEY_NOT_CONFIGURED`);
   }
 
-  let items: string[] = [];
+  let items: GeneratedItem[] = [];
 
-  for (let attempt = 0; attempt < 3 && items.length < 100; attempt++) {
+  for (let attempt = 0; attempt < 3 && items.length < MAX_RANKING_ITEMS; attempt++) {
+    const existingValues = items.map((item) => item.value);
     const result = await Promise.race([
       postJson(provider, {
         model: provider.model,
-        messages: buildMessages(theme, items),
+        messages: buildMessages(theme, existingValues),
         temperature: attempt === 0 ? 0.3 : 0.5,
-        max_tokens: provider.maxTokens ?? getMaxTokens(items),
+        max_tokens: provider.maxTokens ?? getMaxTokens(existingValues),
         ...provider.extraBody,
       }),
       new Promise<never>((_, reject) =>
@@ -327,17 +369,21 @@ async function generateWithProvider(
       ),
     ]);
 
-    const extractedItems = buildRankingFromText(result.content);
-    items = dedupeItems([...items, ...extractedItems]);
+    const previousCount = items.length;
+    items = dedupeItems([...items, ...buildRankingFromText(result.content)]);
+
+    // Continuação sem item novo = o tema acabou (tema pequeno, DOMAIN §5).
+    if (items.length === previousCount) break;
   }
 
-  if (items.length < 100) {
+  if (items.length < MIN_AI_RANKING_ITEMS) {
     throw new Error('INSUFFICIENT_ITEMS_FROM_PROVIDER');
   }
 
-  const ranking = items.slice(0, 100).map((value, index) => ({
+  const ranking = items.slice(0, MAX_RANKING_ITEMS).map((item, index) => ({
     position: index + 1,
-    value,
+    value: item.value,
+    ...(item.aliases.length > 0 ? { aliases: item.aliases } : {}),
   }));
 
   return {

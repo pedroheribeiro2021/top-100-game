@@ -89,6 +89,8 @@ export default function Home() {
   const [customTimeUnit, setCustomTimeUnit] = useState<"s" | "min">("s");
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<ThemeSummary[]>([]);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [creatingFreeTheme, setCreatingFreeTheme] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   function applyCustomTime(value: string, unit: "s" | "min") {
@@ -140,7 +142,9 @@ export default function Home() {
 
     try {
       setLoading(true);
+      setCreatingFreeTheme(!!params.theme);
       setSuggestions([]);
+      setAiError(null);
       const game = await createGame({
         ...params,
         hostName,
@@ -150,6 +154,13 @@ export default function Home() {
       localStorage.setItem("playerId", game.hostId);
       window.location.href = `/game/${game.gameCode}`;
     } catch (error: unknown) {
+      // IA indisponível (503): erro na tela, com temas parecidos do banco.
+      if (error instanceof CreateGameError && error.status === 503) {
+        setAiError(error.message);
+        setSuggestions(error.suggestions ?? []);
+        return;
+      }
+
       // Tema sem correspondência: mostra as sugestões na tela em vez de um alerta.
       if (error instanceof CreateGameError && error.suggestions?.length) {
         setSuggestions(error.suggestions);
@@ -161,6 +172,7 @@ export default function Home() {
       alert(message);
     } finally {
       setLoading(false);
+      setCreatingFreeTheme(false);
     }
   }
 
@@ -358,10 +370,26 @@ export default function Home() {
             </div>
           )}
 
+          {loading && creatingFreeTheme && (
+            <div className="border-2 border-retro-cyan-dark bg-cyan-50 p-2 text-sm text-gray-800">
+              <p className="font-bold text-retro-cyan-dark">Montando o ranking…</p>
+              <p>
+                Sem tema pronto com esse nome, a IA gera o ranking na hora. Pode levar até
+                1 minuto — não feche a página.
+              </p>
+            </div>
+          )}
+
+          {aiError && (
+            <div className="border-2 border-retro-red-dark bg-red-50 p-2 text-sm text-gray-800">
+              <p className="font-bold text-retro-red-dark">{aiError}</p>
+            </div>
+          )}
+
           {suggestions.length > 0 && (
             <div className="border-2 border-retro-yellow-dark bg-yellow-50 p-2 text-sm">
               <p className="mb-1 font-bold text-retro-yellow-dark">
-                Não achamos esse tema exato. Que tal:
+                {aiError ? "Temas prontos parecidos:" : "Não achamos esse tema exato. Que tal:"}
               </p>
               <ul className="space-y-1">
                 {suggestions.map((theme) => (
@@ -384,7 +412,7 @@ export default function Home() {
             disabled={loading || !query.trim() || !hostName.trim()}
             className="w-full"
           >
-            {loading ? "Criando..." : "Criar sala com esse tema"}
+            {loading ? (creatingFreeTheme ? "Gerando ranking..." : "Criando...") : "Criar sala com esse tema"}
           </RetroButton>
 
           <RetroButton

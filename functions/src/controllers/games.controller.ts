@@ -16,7 +16,7 @@ import {
   MAX_ROUND_TIME_LIMIT_SECONDS,
 } from '../services/games.service';
 import { RankingGenerationError } from '../services/ranking.service';
-import { listThemes } from '../services/themes.service';
+import { listThemes, resolveThemeByQuery } from '../services/themes.service';
 
 /**
  * ADR-0002: ranking (Top 100) só pode ser exposto quando o jogo termina.
@@ -85,10 +85,15 @@ export async function createGameHandler(req: Request, res: Response) {
     if (error instanceof RankingGenerationError) {
       console.error('Ranking generation unavailable', error.details);
 
+      // Temas parecidos do banco para o jogador não ficar sem saída.
+      const match = resolveThemeByQuery(String(req.body.theme ?? ''), {
+        minScore: Infinity,
+      });
+
       return res.status(503).json({
         error:
-          'Nenhum provedor gratuito conseguiu gerar esse tema agora. Tente novamente em alguns instantes.',
-        details: error.details,
+          'A IA não conseguiu montar um ranking para esse tema agora. Tente outro tema, um tema pronto ou o tema aleatório.',
+        suggestions: match.matched ? [] : match.suggestions,
       });
     }
 

@@ -12,6 +12,8 @@ export class CreateGameError extends Error {
   constructor(
     message: string,
     readonly suggestions?: ThemeSummary[],
+    /** 503 = a IA não conseguiu gerar o tema livre (ADR-0003). */
+    readonly status?: number,
   ) {
     super(message);
   }
@@ -49,6 +51,7 @@ export async function createGame(params: {
     throw new CreateGameError(
       err?.error || "Failed to create game",
       err?.suggestions,
+      response.status,
     );
   }
   return response.json();

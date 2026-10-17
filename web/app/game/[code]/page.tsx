@@ -633,13 +633,15 @@ function FinalResultSection({
             onClick={() => setShowFullRanking((v) => !v)}
             className="w-full"
           >
-            {showFullRanking ? "Ocultar Top 100 completo" : "Ver Top 100 completo"}
+            {showFullRanking
+              ? `Ocultar Top ${game.ranking.length} completo`
+              : `Ver Top ${game.ranking.length} completo`}
           </RetroButton>
 
           {showFullRanking && (
             <RetroCard color="cyan" className="mt-2">
               <h3 className="mb-2 font-bold text-gray-900">
-                Top 100 completo — {game.theme}
+                Top {game.ranking.length} completo — {game.theme}
               </h3>
               <ol className="max-h-64 list-inside list-decimal space-y-1 overflow-y-auto text-sm text-gray-800">
                 {[...game.ranking]
