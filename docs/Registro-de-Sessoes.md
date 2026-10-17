@@ -1,5 +1,13 @@
 # Registro de sessões
 
+## 2026-10-16 — Aviso de lista menor, palpites ocultos e bot
+- **Staging:** "Presidentes do Brasil" passou depois do #62 (45 itens, 38 com aliases); nomes vinham sem acento → prompt pede acentuação (no #63).
+- **#63 (feature/tamanho-ranking):** API expõe `rankingSize`; lobby "Top N" e faixa "lista menor" com < 100 itens.
+- **#64 (feature/ocultar-palpites):** durante a rodada a API só envia `{playerId}` em `currentRoundAnswers` e `/answer` não devolve pontos.
+- **feature/bot:** bots no lobby (fácil/médio/difícil), palpite no servidor ao abrir a rodada com `revealAt`, morte súbita só de bots fecha sozinha. ADR-0004.
+- **Testes:** partida solo contra bots ponta a ponta na API local e no navegador; médias por nível (12/29/55 pts por rodada após recalibrar — o difícil inicial fazia ~86).
+- **Ordem de merge:** #63 → #64 → bot (empilhados).
+
 ## 2026-10-16 — Tema livre por IA: completar a feature
 - **Diagnóstico:** `/health/providers` em staging → Gemini configurado com `gemini-2.0-flash-lite` respondendo 404; sem Groq/OpenRouter. Todo tema livre virava 503.
 - **Alterações:** `ranking.service.ts` (prompt JSON com aliases, sanitização de parênteses, dedupe de aliases ambíguos, tema pequeno ≥ 30 itens, mensagem de erro do Gemini em array); `games.service.ts` (cache `generatedRankings`); controller (503 com sugestões do banco); Home (aviso "montando o ranking", erro inline com temas parecidos); tela final mostra "Top N".

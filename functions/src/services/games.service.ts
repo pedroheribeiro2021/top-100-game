@@ -226,6 +226,159 @@ function getActivePlayerIds(game: any): string[] {
 }
 
 /**
+ * Confere um palpite (DOMAIN §4) contra o ranking e os itens já usados.
+ * O mesmo item na mesma rodada pontua para todos que acertaram; só fica
+ * "já usado" se já pontuou numa rodada anterior.
+ */
+function scoreAnswer(game: any, playerId: string, answer: string) {
+  const rankingItem = findRankingItem(game.ranking, answer);
+  const usedItems: string[] = game.usedItems || [];
+  const normalizedValue = rankingItem ? normalize(rankingItem.value) : null;
+  const scoredThisRound =
+    normalizedValue !== null &&
+    (game.currentRoundAnswers || []).some((a: any) => {
+      if (a.points <= 0) return false;
+      const item = findRankingItem(game.ranking, a.answer);
+      return item !== null && normalize(item.value) === normalizedValue;
+    });
+  const alreadyUsed =
+    normalizedValue !== null && usedItems.includes(normalizedValue) && !scoredThisRound;
+  const points = rankingItem && !alreadyUsed ? rankingItem.position : 0;
+
+  return {
+    answer: { playerId, answer, points, alreadyUsed } as RoundAnswer,
+    normalizedValue,
+    usedItems:
+      normalizedValue && !usedItems.includes(normalizedValue)
+        ? [...usedItems, normalizedValue]
+        : usedItems,
+  };
+}
+
+/**
+ * Bot (DOMAIN §2, ADR-0004): sem IA — escolhe um item do próprio ranking,
+ * numa faixa que depende da dificuldade, e às vezes "não lembra" (0 pts).
+ * Faixas em fração do tamanho do ranking.
+ */
+export const BOT_LEVELS = ['easy', 'medium', 'hard'] as const;
+type BotLevel = (typeof BOT_LEVELS)[number];
+
+const BOT_LEVEL_LABELS: Record<BotLevel, string> = {
+  easy: 'Fácil',
+  medium: 'Médio',
+  hard: 'Difícil',
+};
+
+// Média esperada por rodada num Top 100: fácil ~10, médio ~28, difícil ~50.
+const BOT_PROFILES: Record<BotLevel, { from: number; to: number; missChance: number }> = {
+  easy: { from: 0, to: 0.3, missChance: 0.3 },
+  medium: { from: 0.15, to: 0.55, missChance: 0.2 },
+  hard: { from: 0.35, to: 0.85, missChance: 0.15 },
+};
+
+const BOT_MISS_ANSWER = '(não lembrou)';
+const BOT_MIN_REVEAL_SECONDS = 3;
+const BOT_MAX_REVEAL_SECONDS = 12;
+// Rodadas seguidas só entre bots (morte súbita sem humanos) fecham na hora.
+const MAX_INSTANT_BOT_ROUNDS = 10;
+
+function randomItem<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function pickBotAnswer(game: any, level: BotLevel, takenThisRound: Set<string>) {
+  const profile = BOT_PROFILES[level] ?? BOT_PROFILES.medium;
+  const usedItems: string[] = game.usedItems || [];
+  const ranking: { position: number; value: string }[] = game.ranking || [];
+  const available = ranking.filter((item) => {
+    const key = normalize(item.value);
+    return !usedItems.includes(key) && !takenThisRound.has(key);
+  });
+
+  if (available.length === 0 || Math.random() < profile.missChance) {
+    return BOT_MISS_ANSWER;
+  }
+
+  const size = ranking.length;
+  const inRange = available.filter(
+    (item) =>
+      item.position > Math.floor(size * profile.from) &&
+      item.position <= Math.ceil(size * profile.to),
+  );
+
+  return randomItem(inRange.length > 0 ? inRange : available).value;
+}
+
+/**
+ * Bots ativos palpitam assim que a rodada abre. `revealAt` só controla
+ * quando o "respondeu" aparece para os humanos (parecer gente), não a
+ * pontuação.
+ */
+function buildBotAnswers(game: any) {
+  const activeIds = getActivePlayerIds(game);
+  let currentRoundAnswers: any[] = [...(game.currentRoundAnswers || [])];
+  let usedItems: string[] = [...(game.usedItems || [])];
+  const takenThisRound = new Set<string>();
+  const maxRevealSeconds = Math.max(
+    BOT_MIN_REVEAL_SECONDS,
+    Math.min(BOT_MAX_REVEAL_SECONDS, game.roundTimeLimit * 0.6),
+  );
+
+  const pendingBots = (game.players || []).filter(
+    (p: any) =>
+      p.isBot &&
+      activeIds.includes(p.id) &&
+      !currentRoundAnswers.some((a: any) => a.playerId === p.id),
+  );
+
+  for (const bot of pendingBots) {
+    const answer = pickBotAnswer(game, bot.botLevel, takenThisRound);
+    const scored = scoreAnswer({ ...game, currentRoundAnswers, usedItems }, bot.id, answer);
+    if (scored.normalizedValue) takenThisRound.add(scored.normalizedValue);
+
+    const revealSeconds =
+      BOT_MIN_REVEAL_SECONDS + Math.random() * (maxRevealSeconds - BOT_MIN_REVEAL_SECONDS);
+    currentRoundAnswers = [
+      ...currentRoundAnswers,
+      { ...scored.answer, revealAt: Date.now() + Math.round(revealSeconds * 1000) },
+    ];
+    usedItems = scored.usedItems;
+  }
+
+  return { currentRoundAnswers, usedItems };
+}
+
+function allActivePlayersAnswered(game: any) {
+  return getActivePlayerIds(game).every((id: string) =>
+    (game.currentRoundAnswers || []).some((a: any) => a.playerId === id),
+  );
+}
+
+/**
+ * Fecha a rodada e, se abrir outra, já registra os palpites dos bots. Se a
+ * nova rodada só tem bots ativos (morte súbita sem humanos), fecha de novo
+ * na hora, até desempatar ou atingir o limite.
+ */
+function closeRound(game: any) {
+  let state = game;
+  let update: any = {};
+
+  for (let i = 0; i < MAX_INSTANT_BOT_ROUNDS; i++) {
+    const closure = buildRoundClosureUpdate(state);
+    state = { ...state, ...closure };
+    update = { ...update, ...closure, usedItems: state.usedItems || [] };
+    if (closure.status === 'FINISHED') break;
+
+    const bots = buildBotAnswers(state);
+    state = { ...state, ...bots };
+    update = { ...update, ...bots };
+    if (!allActivePlayersAnswered(state)) break;
+  }
+
+  return update;
+}
+
+/**
  * Fecha a rodada atual: pontua quem respondeu, ausentes ficam em 0
  * (DOMAIN §3). Usado pelo avanço manual, pela expiração lazy e por
  * submitAnswer quando todos os jogadores ativos já responderam.
@@ -360,7 +513,7 @@ export async function applyRoundTimeoutIfNeeded(gameId: string) {
     const game = snapshot.data();
     if (!game || !isRoundExpired(game)) return game;
 
-    const update = buildRoundClosureUpdate(game);
+    const update = closeRound(game);
     transaction.update(docRef, update);
 
     return { ...game, ...update };
@@ -432,6 +585,50 @@ export async function joinGame(gameCode: string, playerName: string) {
   return newPlayer;
 }
 
+async function getLobbyForHost(gameId: string, playerId: string) {
+  const docRef = db.collection('games').doc(gameId);
+  const doc = await docRef.get();
+  if (!doc.exists) throw new Error('GAME_NOT_FOUND');
+
+  const game = doc.data();
+  if (!game) throw new Error('GAME_NOT_FOUND');
+  if (game.status !== 'RANKING_READY') throw new Error('GAME_ALREADY_STARTED');
+  if (playerId !== game.hostId) throw new Error('NOT_HOST');
+
+  return { docRef, game };
+}
+
+/** Host adiciona um bot no lobby (DOMAIN §2); conta como jogador da sala. */
+export async function addBot(gameId: string, playerId: string, level: string) {
+  if (!BOT_LEVELS.includes(level as BotLevel)) throw new Error('INVALID_BOT_LEVEL');
+
+  const { docRef, game } = await getLobbyForHost(gameId, playerId);
+  const players: any[] = game.players || [];
+  if (players.length >= MAX_PLAYERS) throw new Error('GAME_FULL');
+
+  const baseName = `Bot ${BOT_LEVEL_LABELS[level as BotLevel]}`;
+  const takenNames = new Set(players.map((p: any) => p.name.trim().toLowerCase()));
+  let name = baseName;
+  for (let n = 2; takenNames.has(name.toLowerCase()); n++) name = `${baseName} ${n}`;
+
+  const bot = { id: randomUUID(), name, score: 0, isBot: true, botLevel: level };
+
+  await docRef.update({ players: [...players, bot], updatedAt: new Date() });
+
+  return bot;
+}
+
+export async function removeBot(gameId: string, playerId: string, botId: string) {
+  const { docRef, game } = await getLobbyForHost(gameId, playerId);
+  const players: any[] = game.players || [];
+  if (!players.some((p: any) => p.id === botId && p.isBot)) throw new Error('BOT_NOT_FOUND');
+
+  await docRef.update({
+    players: players.filter((p: any) => p.id !== botId),
+    updatedAt: new Date(),
+  });
+}
+
 export async function startGame(gameId: string, playerId: string) {
   const doc = await db.collection('games').doc(gameId).get();
 
@@ -453,8 +650,7 @@ export async function startGame(gameId: string, playerId: string) {
   }
 
   const roundDeadlineAt = getNextRoundDeadline(game.roundTimeLimit);
-
-  await db.collection('games').doc(gameId).update({
+  const firstRound = {
     status: 'STARTED',
     roundPhase: 'ANSWERING',
     currentRound: 1,
@@ -465,6 +661,11 @@ export async function startGame(gameId: string, playerId: string) {
     roundDeadlineAt,
     roundPausedRemainingMs: null,
     updatedAt: new Date(),
+  };
+
+  await db.collection('games').doc(gameId).update({
+    ...firstRound,
+    ...buildBotAnswers({ ...game, ...firstRound }),
   });
 
   return {
@@ -500,7 +701,8 @@ export async function submitAnswer(
   if (isRoundPaused(game)) throw new Error('ROUND_PAUSED');
 
   const player = game.players.find((p: any) => p.id === playerId);
-  if (!player) throw new Error('PLAYER_NOT_FOUND');
+  // Bot só palpita pelo servidor (buildBotAnswers).
+  if (!player || player.isBot) throw new Error('PLAYER_NOT_FOUND');
 
   const activePlayerIds = getActivePlayerIds(game);
 
@@ -514,61 +716,24 @@ export async function submitAnswer(
 
   if (alreadyAnswered) throw new Error('ALREADY_ANSWERED');
 
-  const rankingItem = findRankingItem(game.ranking, answer);
-  const usedItems: string[] = game.usedItems || [];
-  const normalizedValue = rankingItem ? normalize(rankingItem.value) : null;
-  // DOMAIN §4: o mesmo item na mesma rodada pontua para todos que acertaram;
-  // só fica "já usado" se já pontuou numa rodada anterior.
-  const scoredThisRound =
-    normalizedValue !== null &&
-    (game.currentRoundAnswers || []).some((a: any) => {
-      if (a.points <= 0) return false;
-      const item = findRankingItem(game.ranking, a.answer);
-      return item !== null && normalize(item.value) === normalizedValue;
-    });
-  const alreadyUsed =
-    normalizedValue !== null && usedItems.includes(normalizedValue) && !scoredThisRound;
-  const points = rankingItem && !alreadyUsed ? rankingItem.position : 0;
-
-  const newAnswer = {
-    playerId,
-    answer,
-    points,
-    alreadyUsed,
+  const scored = scoreAnswer(game, playerId, answer);
+  const answeredGame = {
+    ...game,
+    currentRoundAnswers: [...(game.currentRoundAnswers || []), scored.answer],
+    usedItems: scored.usedItems,
   };
 
-  const updatedUsedItems =
-    normalizedValue && !usedItems.includes(normalizedValue)
-      ? [...usedItems, normalizedValue]
-      : usedItems;
-
-  const updatedAnswers = [...(game.currentRoundAnswers || []), newAnswer];
-
-  const allActiveAnswered = activePlayerIds.every((id: string) =>
-    updatedAnswers.some((a: any) => a.playerId === id),
-  );
-
-  const update = allActiveAnswered
-    ? buildRoundClosureUpdate({ ...game, currentRoundAnswers: updatedAnswers })
+  const update = allActivePlayersAnswered(answeredGame)
+    ? closeRound(answeredGame)
     : {
-        players: game.players,
-        currentRound: game.currentRound,
-        currentRoundAnswers: updatedAnswers,
-        roundPhase: game.roundPhase,
-        roundHistory: game.roundHistory || [],
-        roundDeadlineAt: game.roundDeadlineAt || null,
-        status: game.status,
-        tiedPlayerIds: game.tiedPlayerIds || [],
-        winner: game.winner || null,
+        currentRoundAnswers: answeredGame.currentRoundAnswers,
+        usedItems: answeredGame.usedItems,
         updatedAt: new Date(),
       };
 
-  await db.collection('games').doc(gameId).update({
-    ...update,
-    usedItems: updatedUsedItems,
-  });
+  await db.collection('games').doc(gameId).update(update);
 
-  return newAnswer;
+  return scored.answer;
 }
 
 /**
@@ -635,7 +800,7 @@ export async function advanceRound(gameId: string) {
   if (game.status !== 'STARTED' && game.status !== 'SUDDEN_DEATH')
     throw new Error('INVALID_GAME_STATE');
 
-  const update = buildRoundClosureUpdate(game);
+  const update = closeRound(game);
   await db.collection('games').doc(gameId).update(update);
 
   if (update.status === 'FINISHED') {

@@ -36,6 +36,7 @@ top-100-game/
 | GET | `/games/:id` | estado do jogo (visão sanitizada; `ranking` e `usedItems` só quando `status = FINISHED`, ADR-0002; `rankingSize` sempre) |
 | GET | `/games/code/:code` | estado do jogo por `gameCode` (6 chars, case-insensitive); usado pelo link/QR de convite — mesma sanitização de `/games/:id` |
 | POST | `/games/join` | entra na sala por `gameCode` + `playerName` (recusa sala cheia `GAME_FULL` e nome duplicado `NAME_TAKEN`) |
+| POST · DELETE | `/games/:id/bots` · `/games/:id/bots/:botId` | host adiciona (`level`: easy/medium/hard) ou remove bot no lobby (`playerId` do host no corpo); bots palpitam no servidor ao abrir cada rodada (ADR-0004) |
 | POST | `/games/:id/start` | inicia (status RANKING_READY → STARTED); exige `playerId` do host no corpo (`NOT_HOST` senão) e ≥ 2 jogadores |
 | POST | `/games/:id/answer` | registra palpite, pontua, avança rodada quando todos os jogadores ativos responderam; recusa após o prazo (`ROUND_EXPIRED`) e recusa quem está fora da morte súbita (`NOT_IN_SUDDEN_DEATH`) |
 | POST | `/games/:id/pause` · `/games/:id/resume` | host pausa/retoma o cronômetro da rodada em ANSWERING (`playerId` do host no corpo; `NOT_HOST` senão); pausado, `/answer` recusa com 409 (`ROUND_PAUSED`) |

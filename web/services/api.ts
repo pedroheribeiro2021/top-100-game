@@ -136,6 +136,40 @@ export async function setRoundPaused(
 }
 
 //
+// BOTS (só o host, no lobby)
+//
+export async function addBot(
+  id: string,
+  playerId: string,
+  level: "easy" | "medium" | "hard",
+) {
+  const response = await fetch(`${API_URL}/games/${id}/bots`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId, level }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error || "Failed to add bot");
+  }
+  return response.json();
+}
+
+export async function removeBot(id: string, playerId: string, botId: string) {
+  const response = await fetch(`${API_URL}/games/${id}/bots/${botId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error || "Failed to remove bot");
+  }
+}
+
+//
 // SUBMIT ANSWER
 //
 export async function submitAnswer(

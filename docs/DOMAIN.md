@@ -11,6 +11,7 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 - Código de 6 caracteres para entrar.
 - **2 a 5 jogadores**. Partida não inicia com menos de 2; sala cheia recusa entrada.
 - **Host** = criador da sala; só ele inicia a partida.
+- **Bots** (ADR-0004): no lobby, o host adiciona/remove bots (fácil, médio ou difícil). Bot conta como jogador (dá para jogar sozinho: host + bot) e segue as mesmas regras de pontuação, item usado, morte súbita e pausa. Fácil chuta itens do topo; difícil vai fundo no ranking; às vezes "não lembra" (0 pts).
 - Configuração na criação: nº de rodadas **3/5/7/10** (padrão 5) e tempo por rodada — atalhos **15/30/45/60s** ou valor **personalizado** (segundos ou minutos), entre **10s e 600s (10min)**; padrão 30s.
 - Tema: digitado pelo host (casado com o banco de temas, ver §5) ou sorteado ("tema aleatório").
 - Não se entra em partida já iniciada.

@@ -14,11 +14,11 @@ Documento por partida (id = UUID). Campos atuais:
 | `status` | `RANKING_READY` \| `STARTED` \| `SUDDEN_DEATH` \| `FINISHED` | estados em DOMAIN §8 |
 | `roundPhase` | `ANSWERING` \| `RESULT` \| null | fase da rodada |
 | `hostId` | string | id do jogador criador; só ele pode iniciar (`startGame`) e pedir rematch |
-| `players` | `{id, name, score}[]` | 1–5 (host entra na criação); nome duplicado é recusado (`NAME_TAKEN`), 6º jogador recebe `GAME_FULL` |
+| `players` | `{id, name, score, isBot?, botLevel?}[]` | 1–5, bots incluídos (ADR-0004; `botLevel` = `easy`\|`medium`\|`hard`) (host entra na criação); nome duplicado é recusado (`NAME_TAKEN`), 6º jogador recebe `GAME_FULL` |
 | `ranking` | `{position, value, aliases?}[]` | **secreto** — nunca sai na API antes de FINISHED (ADR-0002) |
 | `currentRound` / `maxRounds` | number | `maxRounds` ∈ {3,5,7,10}, padrão 5; `currentRound` continua subindo além de `maxRounds` durante SUDDEN_DEATH |
 | `roundTimeLimit` | number (s) | ∈ {15,30,45,60}, padrão 30 |
-| `currentRoundAnswers` | `{playerId, answer, points, alreadyUsed}[]` | limpo a cada rodada; a API só expõe `{playerId}` enquanto a partida não termina (DOMAIN §3) |
+| `currentRoundAnswers` | `{playerId, answer, points, alreadyUsed}[]` | limpo a cada rodada; a API só expõe `{playerId}` enquanto a partida não termina (DOMAIN §3); palpite de bot tem `revealAt` (ms) e só aparece depois dele |
 | `usedItems` | string[] | valores normalizados já pontuados; nunca sai na API antes de FINISHED (ADR-0002) |
 | `tiedPlayerIds` | string[] | ids empatados na liderança durante `SUDDEN_DEATH` (DOMAIN §6); só eles podem responder |
 | `roundHistory` | `{round, answers, ranking}[]` | `ranking` = placar dos jogadores |

@@ -24,7 +24,7 @@ export default function RoundResultView({ entry, players }: Props) {
               className="flex items-center justify-between gap-3 border-b border-gray-200 pb-3 last:border-0 last:pb-0"
             >
               <div className="min-w-0">
-                <p className="font-bold text-gray-900">{player?.name || "?"}</p>
+                <p className="font-bold text-gray-900">{player?.isBot && "🤖 "}{player?.name || "?"}</p>
                 <p className="truncate text-sm text-gray-600">
                   Palpite: <span className="font-semibold">{a.answer}</span>
                 </p>

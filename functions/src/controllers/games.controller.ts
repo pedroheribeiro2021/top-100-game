@@ -10,6 +10,8 @@ import {
   advanceRound,
   rematchGame,
   setRoundPaused,
+  addBot,
+  removeBot,
   ThemeNotFoundError,
   ALLOWED_ROUND_COUNTS,
   MIN_ROUND_TIME_LIMIT_SECONDS,
@@ -43,7 +45,11 @@ function toPublicGame(game: any) {
  * revelação, via roundHistory.
  */
 function toPublicRoundAnswers(answers: any[] | undefined) {
-  return (answers || []).map((a: any) => ({ playerId: a.playerId }));
+  const now = Date.now();
+  return (answers || [])
+    // Bot já palpitou no servidor; o "respondeu" só aparece em `revealAt`.
+    .filter((a: any) => !a.revealAt || a.revealAt <= now)
+    .map((a: any) => ({ playerId: a.playerId }));
 }
 
 export async function createGameHandler(req: Request, res: Response) {
@@ -304,6 +310,50 @@ export function pauseRoundHandler(paused: boolean) {
       return res.status(500).json({ error: 'Internal server error' });
     }
   };
+}
+
+function sendBotError(res: Response, error: any) {
+  switch (error.message) {
+    case 'GAME_NOT_FOUND':
+      return res.status(404).json({ error: 'Game not found' });
+    case 'BOT_NOT_FOUND':
+      return res.status(404).json({ error: 'Bot não encontrado' });
+    case 'NOT_HOST':
+      return res.status(403).json({ error: 'Apenas o host pode gerenciar bots' });
+    case 'GAME_ALREADY_STARTED':
+      return res.status(400).json({ error: 'Bots só podem ser alterados no lobby' });
+    case 'GAME_FULL':
+      return res.status(400).json({ error: 'Sala cheia (máximo 5 jogadores)' });
+    case 'INVALID_BOT_LEVEL':
+      return res.status(400).json({ error: 'Dificuldade deve ser easy, medium ou hard' });
+    default:
+      console.error(error);
+      return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function addBotHandler(req: Request, res: Response) {
+  try {
+    const { playerId, level } = req.body;
+    if (!playerId) return res.status(400).json({ error: 'playerId is required' });
+
+    const bot = await addBot(req.params.id, playerId, level);
+    return res.status(201).json(bot);
+  } catch (error: any) {
+    return sendBotError(res, error);
+  }
+}
+
+export async function removeBotHandler(req: Request, res: Response) {
+  try {
+    const { playerId } = req.body;
+    if (!playerId) return res.status(400).json({ error: 'playerId is required' });
+
+    await removeBot(req.params.id, playerId, req.params.botId);
+    return res.status(204).send();
+  } catch (error: any) {
+    return sendBotError(res, error);
+  }
 }
 
 /**
