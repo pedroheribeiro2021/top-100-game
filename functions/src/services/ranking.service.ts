@@ -16,6 +16,8 @@ type GeneratedItem = {
 export const MIN_AI_RANKING_ITEMS = 30;
 const MAX_RANKING_ITEMS = 100;
 const MAX_ALIASES_PER_ITEM = 4;
+// 100 itens em JSON com aliases levam ~15–20s no Gemini com raciocínio baixo.
+const GENERATION_TIMEOUT_MS = 40000;
 
 export type RankingGenerationResult = {
   ranking: RankingItem[];
@@ -353,21 +355,34 @@ async function generateWithProvider(
 
   for (let attempt = 0; attempt < 3 && items.length < MAX_RANKING_ITEMS; attempt++) {
     const existingValues = items.map((item) => item.value);
-    const result = await Promise.race([
-      postJson(provider, {
-        model: provider.model,
-        messages: buildMessages(theme, existingValues),
-        temperature: attempt === 0 ? 0.3 : 0.5,
-        max_tokens: provider.maxTokens ?? getMaxTokens(existingValues),
-        ...provider.extraBody,
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`${provider.name.toUpperCase()}_TIMEOUT`)),
-          25000,
+    let result: ProviderResult;
+
+    try {
+      result = await Promise.race([
+        postJson(provider, {
+          model: provider.model,
+          messages: buildMessages(theme, existingValues),
+          temperature: attempt === 0 ? 0.3 : 0.5,
+          max_tokens: provider.maxTokens ?? getMaxTokens(existingValues),
+          ...provider.extraBody,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`${provider.name.toUpperCase()}_TIMEOUT`)),
+            GENERATION_TIMEOUT_MS,
+          ),
         ),
-      ),
-    ]);
+      ]);
+    } catch (error) {
+      // Falha na continuação não descarta o que já veio: o tamanho mínimo
+      // decide abaixo se dá para jogar (tema pequeno, DOMAIN §5).
+      if (items.length === 0) throw error;
+      console.warn(`Ranking continuation failed for provider ${provider.name}.`, {
+        items: items.length,
+        message: (error as Error).message,
+      });
+      break;
+    }
 
     const previousCount = items.length;
     items = dedupeItems([...items, ...buildRankingFromText(result.content)]);
