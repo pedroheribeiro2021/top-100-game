@@ -22,11 +22,11 @@ Fonte: protótipo Figma <https://dodge-sorbet-20715481.figma.site> (navegado em 
 6. **REVELAÇÃO** — banner "RESULTADO DA RODADA N" (gradiente amarelo→laranja); card por jogador: palpite, ✓/✗, posição e pontos; PRÓXIMA RODADA (ou resultado final).
 7. **VERIFICAÇÃO** — sistema calcula líder e detecta empate (sem tela própria).
 8A. **MORTE SÚBITA** — mesma mecânica, até desempatar.
-8B. **FIM DE JOGO** — ranking final, vencedor, VER TOP 100 COMPLETO, JOGAR NOVAMENTE, NOVA SALA, SAIR.
+8B. **FIM DE JOGO** — ranking final, vencedor, VER TOP 100 COMPLETO, REPETIR O TEMA / JOGAR COM TEMA ALEATÓRIO (só host), NOVA SALA, SAIR. Faixa "tema gerado por IA" só aparece quando `rankingSource ≠ bank`.
 
 ## Loops e saídas
 - Rodadas: JOGANDO → REVELAÇÃO → JOGANDO (até a última) → VERIFICAÇÃO → MORTE SÚBITA ou FIM.
-- Replay: FIM → JOGAR NOVAMENTE → JOGANDO.
+- Replay: FIM → REPETIR O TEMA / TEMA ALEATÓRIO → LOBBY → JOGANDO.
 - Voltar para HOME a partir de criar/entrar/lobby/fim.
 
 ## Estado da implementação

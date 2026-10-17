@@ -314,13 +314,18 @@ export async function advanceRoundHandler(req: Request, res: Response) {
 export async function rematchGameHandler(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { playerId, theme, themeId, random } = req.body;
+    const { playerId, theme, themeId, random, sameTheme } = req.body;
 
     if (!playerId) {
       return res.status(400).json({ error: 'playerId is required' });
     }
 
-    const newGame = await rematchGame(id, playerId, { theme, themeId, random });
+    const newGame = await rematchGame(id, playerId, {
+      theme,
+      themeId,
+      random,
+      sameTheme: sameTheme === true,
+    });
 
     return res.status(201).json(toPublicGame(newGame));
   } catch (error: any) {

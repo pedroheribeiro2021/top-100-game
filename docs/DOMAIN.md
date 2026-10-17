@@ -39,7 +39,7 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 ## §6 Fim de jogo e empate
 - Após a última rodada: maior pontuação vence.
 - **Empate na liderança → morte súbita**: rodada extra com a mesma mecânica, só entre os empatados; repete até desempatar.
-- Tela final: ranking dos jogadores, vencedor, **Top 100 completo revelado**, "jogar novamente" (mesma sala/novo tema) e "nova sala".
+- Tela final: ranking dos jogadores, vencedor, **Top 100 completo revelado**, "jogar novamente" (mesma sala; o host escolhe **repetir o tema** — mesmo ranking, inclusive o gerado por IA — ou **tema aleatório**) e "nova sala".
 
 ## §7 Segredo do ranking (invariante — ADR-0002)
 - O ranking **nunca** trafega para o cliente enquanto `status ≠ FINISHED`. A API responde o estado do jogo **sem** o campo `ranking` (e sem nada que o derive) durante a partida.

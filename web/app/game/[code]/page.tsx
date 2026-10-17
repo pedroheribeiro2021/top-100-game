@@ -178,7 +178,7 @@ export default function GamePage() {
         </h1>
       </div>
 
-      {game.rankingSource && (
+      {game.rankingSource && game.rankingSource !== "bank" && (
         <div className="mt-4 border-4 border-blue-400 bg-blue-950/60 p-3 text-center text-sm text-blue-100">
           Tema gerado dinamicamente por IA via {game.rankingSource}.
         </div>
@@ -571,12 +571,12 @@ function FinalResultSection({
     window.location.href = "/";
   }
 
-  async function handleRematch() {
+  async function handleRematch(sameTheme: boolean) {
     if (!currentPlayer) return;
 
     try {
       setRematching(true);
-      const newGame = await rematchGame(game.id, currentPlayer.id);
+      const newGame = await rematchGame(game.id, currentPlayer.id, sameTheme);
       window.location.href = `/game/${newGame.id}`;
     } catch (error: unknown) {
       const message =
@@ -655,9 +655,18 @@ function FinalResultSection({
 
       <div className="flex flex-wrap gap-3">
         {isHost && (
-          <RetroButton onClick={handleRematch} disabled={rematching}>
-            {rematching ? "Criando nova partida..." : "Jogar novamente"}
-          </RetroButton>
+          <>
+            <RetroButton onClick={() => handleRematch(true)} disabled={rematching}>
+              {rematching ? "Criando nova partida..." : "Repetir o tema"}
+            </RetroButton>
+            <RetroButton
+              variant="outline"
+              onClick={() => handleRematch(false)}
+              disabled={rematching}
+            >
+              Jogar com tema aleatório
+            </RetroButton>
+          </>
         )}
 
         <RetroButton variant="secondary" onClick={handleNewGame}>

@@ -40,7 +40,7 @@ top-100-game/
 | POST | `/games/:id/answer` | registra palpite, pontua, avança rodada quando todos os jogadores ativos responderam; recusa após o prazo (`ROUND_EXPIRED`) e recusa quem está fora da morte súbita (`NOT_IN_SUDDEN_DEATH`) |
 | POST | `/games/:id/pause` · `/games/:id/resume` | host pausa/retoma o cronômetro da rodada em ANSWERING (`playerId` do host no corpo; `NOT_HOST` senão); pausado, `/answer` recusa com 409 (`ROUND_PAUSED`) |
 | POST | `/games/:id/advance` | avança rodada manualmente (fallback de timeout) |
-| POST | `/games/:id/rematch` | host cria novo jogo (mesmos jogadores, pontuação zerada) a partir de um jogo `FINISHED`; devolve o novo id (`rematchGameId` no jogo antigo) |
+| POST | `/games/:id/rematch` | host cria novo jogo (mesmos jogadores, pontuação zerada) a partir de um jogo `FINISHED`; tema: `sameTheme: true` repete o anterior (mesmo ranking), ou `themeId`/`theme`/`random` (sem nada = sorteio); devolve o novo id (`rematchGameId` no jogo antigo) |
 
 ## Onde mexer (por tipo de tarefa)
 | Tarefa | Arquivos |

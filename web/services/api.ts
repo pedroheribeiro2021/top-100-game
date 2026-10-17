@@ -166,11 +166,17 @@ export async function advanceRound(gameId: string) {
 //
 // REMATCH (jogar novamente na mesma sala)
 //
-export async function rematchGame(gameId: string, playerId: string) {
+export async function rematchGame(
+  gameId: string,
+  playerId: string,
+  sameTheme: boolean,
+) {
   const response = await fetch(`${API_URL}/games/${gameId}/rematch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId, random: true }),
+    body: JSON.stringify(
+      sameTheme ? { playerId, sameTheme: true } : { playerId, random: true },
+    ),
   });
 
   if (!response.ok) {

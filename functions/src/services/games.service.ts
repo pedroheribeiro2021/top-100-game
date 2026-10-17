@@ -34,6 +34,11 @@ type ThemeSelection = {
   random?: boolean;
 };
 
+type RematchThemeSelection = ThemeSelection & {
+  /** Repete o tema da partida anterior (inclusive ranking gerado por IA). */
+  sameTheme?: boolean;
+};
+
 type CreateGameInput = ThemeSelection & {
   hostName: string;
   maxRounds?: number;
@@ -598,14 +603,15 @@ export async function advanceRound(gameId: string) {
 
 /**
  * "Jogar novamente" (DOMAIN §6): cria um novo documento para o mesmo grupo
- * de jogadores (pontuações e usedItems zerados, tema novo), e aponta o
+ * de jogadores (pontuações e usedItems zerados; mesmo tema com `sameTheme`,
+ * senão o tema escolhido ou um sorteado), e aponta o
  * jogo finalizado antigo para ele (`rematchGameId`) para que os demais
  * clientes, que só sabem pollar o jogo antigo, sigam automaticamente.
  */
 export async function rematchGame(
   gameId: string,
   hostId: string,
-  themeSelection: ThemeSelection = {},
+  themeSelection: RematchThemeSelection = {},
 ) {
   const doc = await db.collection('games').doc(gameId).get();
   if (!doc.exists) throw new Error('GAME_NOT_FOUND');
@@ -618,9 +624,17 @@ export async function rematchGame(
 
   const hasThemeSelection =
     themeSelection.theme || themeSelection.themeId || themeSelection.random;
-  const resolvedTheme = await resolveGameTheme(
-    hasThemeSelection ? themeSelection : { random: true },
-  );
+  const resolvedTheme: ResolvedGameTheme = themeSelection.sameTheme
+    ? {
+        title: game.theme,
+        themeId: game.themeId ?? null,
+        ranking: game.ranking,
+        source: game.rankingSource,
+        warning: game.rankingWarning ?? null,
+      }
+    : await resolveGameTheme(
+        hasThemeSelection ? themeSelection : { random: true },
+      );
 
   const newId = randomUUID();
 
