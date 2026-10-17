@@ -22,11 +22,15 @@ import { listThemes, resolveThemeByQuery } from '../services/themes.service';
  * ADR-0002: ranking (Top 100) só pode ser exposto quando o jogo termina.
  */
 function toPublicGame(game: any) {
-  if (game.status === 'FINISHED') return game;
+  // Só a quantidade de itens: avisa tema gerado com menos de 100 (DOMAIN §5)
+  // sem revelar nenhum item.
+  const rankingSize = Array.isArray(game.ranking) ? game.ranking.length : null;
+
+  if (game.status === 'FINISHED') return { ...game, rankingSize };
 
   // usedItems guarda valores normalizados do ranking — também precisa ficar oculto.
   const { ranking, usedItems, ...publicGame } = game;
-  return publicGame;
+  return { ...publicGame, rankingSize };
 }
 
 export async function createGameHandler(req: Request, res: Response) {

@@ -184,6 +184,13 @@ export default function GamePage() {
         </div>
       )}
 
+      {!!game.rankingSize && game.rankingSize < 100 && (
+        <div className="mt-4 border-4 border-retro-yellow-dark bg-retro-yellow p-3 text-center text-sm font-bold text-gray-900">
+          Lista menor: este ranking tem só {game.rankingSize} itens — cada palpite vale no
+          máximo {game.rankingSize} pontos.
+        </div>
+      )}
+
       {game.status === "SUDDEN_DEATH" && (
         <div className="mt-4 border-4 border-retro-red-dark bg-gradient-to-r from-retro-red to-retro-orange p-3 text-center font-bold tracking-wide text-white uppercase">
           Morte súbita — empate na liderança, só os empatados jogam
@@ -231,6 +238,7 @@ export default function GamePage() {
 
           <RetroCard color="yellow">
             <p className="text-sm text-gray-700">
+              <span className="font-bold">Top {game.rankingSize ?? 100}</span> ·{" "}
               <span className="font-bold">{game.maxRounds}</span> rodadas ·{" "}
               <span className="font-bold">{game.roundTimeLimit}s</span> por rodada ·{" "}
               <span className="font-bold">{game.players.length}/5</span> jogadores
