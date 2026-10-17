@@ -109,6 +109,30 @@ export async function startGame(id: string, playerId: string) {
 }
 
 //
+// PAUSE / RESUME (só o host)
+//
+export async function setRoundPaused(
+  id: string,
+  playerId: string,
+  paused: boolean,
+) {
+  const response = await fetch(
+    `${API_URL}/games/${id}/${paused ? "pause" : "resume"}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId }),
+    },
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error || "Failed to pause game");
+  }
+  return response.json();
+}
+
+//
 // SUBMIT ANSWER
 //
 export async function submitAnswer(

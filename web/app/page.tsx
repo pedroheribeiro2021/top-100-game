@@ -32,6 +32,37 @@ const CATEGORY_LABELS: Record<string, string> = {
   cotidiano: "Cotidiano",
 };
 
+const CATEGORY_ICONS: Record<string, string> = {
+  geografia: "🌍",
+  cinema: "🎬",
+  musica: "🎵",
+  esporte: "⚽",
+  negocios: "💼",
+  natureza: "🌿",
+  gastronomia: "🍔",
+  tv: "📺",
+  games: "🎮",
+  anime: "🍥",
+  "cultura-pop": "⭐",
+  veiculos: "🚗",
+  tecnologia: "💻",
+  historia: "🏛️",
+  ciencia: "🔬",
+  literatura: "📚",
+  cotidiano: "🏠",
+};
+
+// Blocos de categoria alternam as cores de destaque (docs/DESIGN.md).
+const CATEGORY_TILE_CLASSES = [
+  "border-retro-cyan-dark bg-retro-cyan text-gray-900",
+  "border-retro-yellow-dark bg-retro-yellow text-gray-900",
+  "border-retro-pink-dark bg-retro-pink text-white",
+];
+
+// Linha de tema clicável: borda grossa escura + sombra dura curta.
+const THEME_ROW_CLASS =
+  "w-full border-2 border-gray-900 bg-white p-2 text-left text-sm font-semibold shadow-[3px_3px_0_0_#111827] transition-transform hover:bg-retro-cyan/20 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-40";
+
 function normalizeSearch(text: string): string {
   return text
     .normalize("NFD")
@@ -254,16 +285,18 @@ export default function Home() {
           </div>
 
           {query.trim() ? (
-            <ul className="max-h-40 space-y-1 overflow-y-auto">
+            <ul className="max-h-48 space-y-2 overflow-y-auto pr-1 pb-1">
               {filteredThemes.map((theme) => (
                 <li key={theme.id}>
                   <button
                     onClick={() => handleCreate({ themeId: theme.id })}
                     disabled={loading}
-                    className="w-full border-2 border-gray-300 p-2 text-left text-sm hover:border-retro-cyan-dark hover:bg-cyan-50"
+                    className={THEME_ROW_CLASS}
                   >
                     {theme.title}
-                    <span className="ml-2 text-xs text-gray-400">{theme.category}</span>
+                    <span className="ml-2 text-xs font-normal tracking-wide text-gray-500 uppercase">
+                      {CATEGORY_ICONS[theme.category] ?? "🎲"} {categoryLabel(theme.category)}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -273,14 +306,17 @@ export default function Home() {
               )}
             </ul>
           ) : selectedCategory === null ? (
-            <div className="grid grid-cols-2 gap-2">
-              {categories.map((category) => (
+            <div className="grid grid-cols-2 gap-3 pr-1 pb-1">
+              {categories.map((category, index) => (
                 <button
                   key={category}
                   onClick={() => setSelectedCategory(category)}
-                  className="border-2 border-gray-300 p-2 text-left text-sm hover:border-retro-cyan-dark hover:bg-cyan-50"
+                  className={`flex items-center gap-2 border-[3px] p-2 text-left text-xs font-bold tracking-wide uppercase shadow-[3px_3px_0_0_#111827] transition-transform active:translate-x-[2px] active:translate-y-[2px] active:shadow-none ${CATEGORY_TILE_CLASSES[index % CATEGORY_TILE_CLASSES.length]}`}
                 >
-                  {categoryLabel(category)}
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center border-2 border-gray-900 bg-white text-base">
+                    {CATEGORY_ICONS[category] ?? "🎲"}
+                  </span>
+                  <span className="leading-tight">{categoryLabel(category)}</span>
                 </button>
               ))}
 
@@ -290,20 +326,25 @@ export default function Home() {
             </div>
           ) : (
             <div className="space-y-2">
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className="text-xs font-bold tracking-wide text-gray-500 uppercase hover:text-retro-cyan-dark"
-              >
-                ← voltar às categorias
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className="text-xs font-bold tracking-wide text-gray-500 uppercase hover:text-retro-pink"
+                >
+                  ← voltar às categorias
+                </button>
+                <span className="text-xs font-bold tracking-wide text-gray-900 uppercase">
+                  {CATEGORY_ICONS[selectedCategory] ?? "🎲"} {categoryLabel(selectedCategory)}
+                </span>
+              </div>
 
-              <ul className="max-h-40 space-y-1 overflow-y-auto">
+              <ul className="max-h-48 space-y-2 overflow-y-auto pr-1 pb-1">
                 {themesInCategory.map((theme) => (
                   <li key={theme.id}>
                     <button
                       onClick={() => handleCreate({ themeId: theme.id })}
                       disabled={loading}
-                      className="w-full border-2 border-gray-300 p-2 text-left text-sm hover:border-retro-cyan-dark hover:bg-cyan-50"
+                      className={THEME_ROW_CLASS}
                     >
                       {theme.title}
                     </button>

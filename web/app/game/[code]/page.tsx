@@ -8,6 +8,7 @@ import {
   getGameById,
   joinGame,
   rematchGame,
+  setRoundPaused,
   startGame,
   submitAnswer,
 } from "@/services/api";
@@ -310,6 +311,7 @@ function RoundSection({
   const [submitting, setSubmitting] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [togglingPause, setTogglingPause] = useState(false);
 
   const playerId =
     typeof window !== "undefined" ? localStorage.getItem("playerId") : null;
@@ -322,13 +324,20 @@ function RoundSection({
     return () => clearInterval(interval);
   }, []);
 
+  const isPaused = typeof game.roundPausedRemainingMs === "number";
+  const isHost = !!currentPlayer && currentPlayer.id === game.hostId;
+
   const secondsLeft = useMemo(() => {
+    if (typeof game.roundPausedRemainingMs === "number") {
+      return Math.max(Math.floor(game.roundPausedRemainingMs / 1000), 0);
+    }
+
     const deadline = resolveDeadlineMs(game.roundDeadlineAt);
     if (deadline === null) return null;
 
     const diff = Math.floor((deadline - now) / 1000);
     return Math.max(diff, 0);
-  }, [game.roundDeadlineAt, now]);
+  }, [game.roundDeadlineAt, game.roundPausedRemainingMs, now]);
 
   const alreadyAnswered = useMemo(() => {
     if (!playerId) return false;
@@ -366,6 +375,7 @@ function RoundSection({
   useEffect(() => {
     if (game.status !== "STARTED" && game.status !== "SUDDEN_DEATH") return;
     if (game.roundPhase !== "ANSWERING") return;
+    if (isPaused) return;
     if (secondsLeft === null || secondsLeft > 0) return;
     if (advancing) return;
 
@@ -379,7 +389,7 @@ function RoundSection({
     };
 
     void nudge();
-  }, [advancing, game.roundPhase, game.status, reload, secondsLeft]);
+  }, [advancing, game.roundPhase, game.status, isPaused, reload, secondsLeft]);
 
   async function handleSubmit() {
     if (!answer) return alert("Digite uma resposta");
@@ -396,6 +406,22 @@ function RoundSection({
       alert(message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleTogglePause() {
+    if (!playerId) return;
+
+    try {
+      setTogglingPause(true);
+      await setRoundPaused(game.id, playerId, !isPaused);
+      await reload();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao pausar a partida";
+      alert(message);
+    } finally {
+      setTogglingPause(false);
     }
   }
 
@@ -431,9 +457,28 @@ function RoundSection({
           />
         </div>
 
-        <p className="mt-2 text-sm text-gray-600">
-          Respostas recebidas: {playersAnswered}/{totalActivePlayers}
-        </p>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <p className="text-sm text-gray-600">
+            Respostas recebidas: {playersAnswered}/{totalActivePlayers}
+          </p>
+
+          {isHost && game.roundPhase === "ANSWERING" && (
+            <RetroButton
+              variant={isPaused ? "primary" : "outline"}
+              onClick={handleTogglePause}
+              disabled={togglingPause}
+              className="px-3 py-1 text-xs"
+            >
+              {isPaused ? "▶ Retomar" : "❚❚ Pausar"}
+            </RetroButton>
+          )}
+        </div>
+
+        {isPaused && (
+          <p className="mt-2 border-2 border-retro-yellow-dark bg-retro-yellow p-2 text-center text-sm font-bold tracking-widest text-gray-900 uppercase">
+            ❚❚ Partida pausada{isHost ? "" : " pelo host"}
+          </p>
+        )}
       </RetroCard>
 
       {game.roundPhase === "ANSWERING" && (
@@ -452,7 +497,7 @@ function RoundSection({
                 className="flex-1 border-2 border-gray-900 p-2 font-mono"
               />
 
-              <RetroButton onClick={handleSubmit} disabled={submitting}>
+              <RetroButton onClick={handleSubmit} disabled={submitting || isPaused}>
                 Confirmar palpite
               </RetroButton>
             </div>
@@ -501,7 +546,7 @@ function RoundSection({
       )}
 
       <p className="text-center text-xs text-white/80">
-        Quanto mais baixo no ranking, mais pontos! Cada item só pode ser usado uma vez.
+        Quanto mais baixo no ranking, mais pontos! Item acertado numa rodada não pontua nas seguintes.
       </p>
     </div>
   );

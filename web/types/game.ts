@@ -46,6 +46,8 @@ export type Game = {
   currentRoundAnswers: RoundAnswer[];
   roundHistory?: RoundHistoryEntry[];
   roundDeadlineAt?: string | null;
+  /** Tempo restante (ms) congelado enquanto o host pausa a rodada; null = rodando. */
+  roundPausedRemainingMs?: number | null;
   status: GameStatus;
   roundPhase: RoundPhase;
   winner?: Player | null;

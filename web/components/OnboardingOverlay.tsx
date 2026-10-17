@@ -22,7 +22,7 @@ const STEPS = [
   {
     color: "yellow",
     title: "Vença a partida",
-    text: "Cada item só pontua uma vez por partida. Some mais pontos que os outros jogadores até o fim para vencer.",
+    text: "Item acertado numa rodada não pontua de novo nas próximas. Some mais pontos que os outros jogadores até o fim para vencer.",
   },
 ] as const;
 

@@ -22,7 +22,8 @@ Documento por partida (id = UUID). Campos atuais:
 | `usedItems` | string[] | valores normalizados já pontuados; nunca sai na API antes de FINISHED (ADR-0002) |
 | `tiedPlayerIds` | string[] | ids empatados na liderança durante `SUDDEN_DEATH` (DOMAIN §6); só eles podem responder |
 | `roundHistory` | `{round, answers, ranking}[]` | `ranking` = placar dos jogadores |
-| `roundDeadlineAt` | timestamp \| null | expiração da rodada |
+| `roundDeadlineAt` | timestamp \| null | expiração da rodada (null enquanto pausada) |
+| `roundPausedRemainingMs` | number \| null | tempo restante congelado quando o host pausa; null = rodando |
 | `winner` | Player \| null | definido em FINISHED |
 | `rematchGameId` | string \| null | id do novo jogo criado por "jogar novamente" (`POST /:id/rematch`); clientes que ainda pollam o jogo antigo seguem para ele |
 | `rankingSource` | string | `bank` (padrão, ADR-0001) \| `gemini` \| `groq` \| `openrouter` (IA para tema livre, só com `ENABLE_AI_FALLBACK=true`, ADR-0003) |

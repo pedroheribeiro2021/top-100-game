@@ -38,6 +38,7 @@ top-100-game/
 | POST | `/games/join` | entra na sala por `gameCode` + `playerName` (recusa sala cheia `GAME_FULL` e nome duplicado `NAME_TAKEN`) |
 | POST | `/games/:id/start` | inicia (status RANKING_READY → STARTED); exige `playerId` do host no corpo (`NOT_HOST` senão) e ≥ 2 jogadores |
 | POST | `/games/:id/answer` | registra palpite, pontua, avança rodada quando todos os jogadores ativos responderam; recusa após o prazo (`ROUND_EXPIRED`) e recusa quem está fora da morte súbita (`NOT_IN_SUDDEN_DEATH`) |
+| POST | `/games/:id/pause` · `/games/:id/resume` | host pausa/retoma o cronômetro da rodada em ANSWERING (`playerId` do host no corpo; `NOT_HOST` senão); pausado, `/answer` recusa com 409 (`ROUND_PAUSED`) |
 | POST | `/games/:id/advance` | avança rodada manualmente (fallback de timeout) |
 | POST | `/games/:id/rematch` | host cria novo jogo (mesmos jogadores, pontuação zerada) a partir de um jogo `FINISHED`; devolve o novo id (`rematchGameId` no jogo antigo) |
 

@@ -155,8 +155,13 @@ function toMillis(value: any): number {
   return new Date(value).getTime();
 }
 
+function isRoundPaused(game: any): boolean {
+  return typeof game.roundPausedRemainingMs === 'number';
+}
+
 function isRoundExpired(game: any): boolean {
   if (game.roundPhase !== 'ANSWERING') return false;
+  if (isRoundPaused(game)) return false;
   if (!game.roundDeadlineAt) return false;
 
   return toMillis(game.roundDeadlineAt) <= Date.now();
@@ -213,6 +218,7 @@ function buildRoundClosureUpdate(game: any) {
         roundPhase: 'ANSWERING',
         roundHistory,
         roundDeadlineAt: getNextRoundDeadline(game.roundTimeLimit),
+        roundPausedRemainingMs: null,
         status: 'SUDDEN_DEATH',
         tiedPlayerIds: tiedPlayers.map((p: any) => p.id),
         winner: null,
@@ -227,6 +233,7 @@ function buildRoundClosureUpdate(game: any) {
       roundPhase: 'RESULT',
       roundHistory,
       roundDeadlineAt: null,
+      roundPausedRemainingMs: null,
       status: 'FINISHED',
       tiedPlayerIds: [],
       winner: tiedPlayers[0],
@@ -241,6 +248,7 @@ function buildRoundClosureUpdate(game: any) {
     roundPhase: 'ANSWERING',
     roundHistory,
     roundDeadlineAt: getNextRoundDeadline(game.roundTimeLimit),
+    roundPausedRemainingMs: null,
     status: game.status,
     tiedPlayerIds: game.tiedPlayerIds || [],
     winner: game.winner || null,
@@ -273,6 +281,7 @@ export async function createGame(input: CreateGameInput) {
     tiedPlayerIds: [],
     roundHistory: [],
     roundDeadlineAt: null,
+    roundPausedRemainingMs: null,
     winner: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -405,6 +414,7 @@ export async function startGame(gameId: string, playerId: string) {
     tiedPlayerIds: [],
     roundHistory: [],
     roundDeadlineAt,
+    roundPausedRemainingMs: null,
     updatedAt: new Date(),
   });
 
@@ -438,6 +448,8 @@ export async function submitAnswer(
   if (game.roundPhase !== 'ANSWERING')
     throw new Error('ROUND_NOT_ACCEPTING_ANSWERS');
 
+  if (isRoundPaused(game)) throw new Error('ROUND_PAUSED');
+
   const player = game.players.find((p: any) => p.id === playerId);
   if (!player) throw new Error('PLAYER_NOT_FOUND');
 
@@ -456,7 +468,17 @@ export async function submitAnswer(
   const rankingItem = findRankingItem(game.ranking, answer);
   const usedItems: string[] = game.usedItems || [];
   const normalizedValue = rankingItem ? normalize(rankingItem.value) : null;
-  const alreadyUsed = normalizedValue !== null && usedItems.includes(normalizedValue);
+  // DOMAIN §4: o mesmo item na mesma rodada pontua para todos que acertaram;
+  // só fica "já usado" se já pontuou numa rodada anterior.
+  const scoredThisRound =
+    normalizedValue !== null &&
+    (game.currentRoundAnswers || []).some((a: any) => {
+      if (a.points <= 0) return false;
+      const item = findRankingItem(game.ranking, a.answer);
+      return item !== null && normalize(item.value) === normalizedValue;
+    });
+  const alreadyUsed =
+    normalizedValue !== null && usedItems.includes(normalizedValue) && !scoredThisRound;
   const points = rankingItem && !alreadyUsed ? rankingItem.position : 0;
 
   const newAnswer = {
@@ -467,7 +489,9 @@ export async function submitAnswer(
   };
 
   const updatedUsedItems =
-    normalizedValue && !alreadyUsed ? [...usedItems, normalizedValue] : usedItems;
+    normalizedValue && !usedItems.includes(normalizedValue)
+      ? [...usedItems, normalizedValue]
+      : usedItems;
 
   const updatedAnswers = [...(game.currentRoundAnswers || []), newAnswer];
 
@@ -496,6 +520,57 @@ export async function submitAnswer(
   });
 
   return newAnswer;
+}
+
+/**
+ * Pausa/retoma o cronômetro da rodada (DOMAIN §3, só o host). Pausado, o
+ * tempo restante fica em `roundPausedRemainingMs` e `roundDeadlineAt` vira
+ * null — a expiração lazy não dispara e palpites são recusados (ROUND_PAUSED).
+ * Retomar recalcula o prazo a partir de agora.
+ */
+export async function setRoundPaused(
+  gameId: string,
+  playerId: string,
+  paused: boolean,
+) {
+  const docRef = db.collection('games').doc(gameId);
+
+  return db.runTransaction(async (transaction: any) => {
+    const snapshot = await transaction.get(docRef);
+    if (!snapshot.exists) throw new Error('GAME_NOT_FOUND');
+
+    const game = snapshot.data();
+    if (!game) throw new Error('GAME_NOT_FOUND');
+
+    if (playerId !== game.hostId) throw new Error('NOT_HOST');
+    if (game.status !== 'STARTED' && game.status !== 'SUDDEN_DEATH')
+      throw new Error('INVALID_GAME_STATE');
+    if (game.roundPhase !== 'ANSWERING') throw new Error('INVALID_GAME_STATE');
+    if (isRoundExpired(game)) throw new Error('ROUND_EXPIRED');
+
+    const update = paused
+      ? isRoundPaused(game)
+        ? null
+        : {
+            roundPausedRemainingMs: Math.max(
+              0,
+              toMillis(game.roundDeadlineAt) - Date.now(),
+            ),
+            roundDeadlineAt: null,
+            updatedAt: new Date(),
+          }
+      : !isRoundPaused(game)
+        ? null
+        : {
+            roundDeadlineAt: new Date(Date.now() + game.roundPausedRemainingMs),
+            roundPausedRemainingMs: null,
+            updatedAt: new Date(),
+          };
+
+    if (update) transaction.update(docRef, update);
+
+    return { ...game, ...update };
+  });
 }
 
 /**
@@ -568,6 +643,7 @@ export async function rematchGame(
     tiedPlayerIds: [],
     roundHistory: [],
     roundDeadlineAt: null,
+    roundPausedRemainingMs: null,
     winner: null,
     createdAt: new Date(),
     updatedAt: new Date(),
