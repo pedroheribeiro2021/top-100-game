@@ -55,6 +55,8 @@ export type Game = {
   tiedPlayerIds?: string[];
   /** Id do jogo criado por "jogar novamente", se algum host já iniciou um. */
   rematchGameId?: string | null;
+  /** Nº de itens do ranking (só a contagem, ADR-0002); < 100 em tema pequeno gerado por IA. */
+  rankingSize?: number | null;
   rankingSource?: "bank" | "gemini" | "groq" | "openrouter";
   rankingWarning?: string | null;
 };

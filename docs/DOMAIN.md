@@ -35,7 +35,7 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 - Tema digitado é casado com o banco por similaridade (normalização + palavras, com fuzzy simples). Busca ambígua ou sem correspondência: oferecer temas próximos ou sorteio.
 - Tema livre por IA (ADR-0003): com `ENABLE_AI_FALLBACK=true`, tema sem casamento forte no banco é gerado pelo Gemini (free tier; Groq/OpenRouter de reserva). Nunca pode gerar custo.
   - A IA gera também os `aliases` de cada item (sobrenome, sigla, nome em inglês) e devolve o nome sem detalhes entre parênteses.
-  - **Tema pequeno**: se o assunto não tem 100 itens reais ("planetas", "estados do Brasil"), o ranking gerado fica menor — mínimo de **30 itens**; abaixo disso, a geração falha. Pontos continuam = posição.
+  - **Tema pequeno**: se o assunto não tem 100 itens reais ("planetas", "estados do Brasil"), o ranking gerado fica menor — mínimo de **30 itens**; abaixo disso, a geração falha. Pontos continuam = posição. Lobby e jogo avisam "lista menor: N itens, máximo N pontos por palpite".
   - O ranking gerado é guardado por tema normalizado e reaproveitado quando o mesmo tema livre é pedido de novo.
 - Ordem dos itens é aproximada por natureza; a curadoria prioriza plausibilidade e diversão, não precisão estatística.
 
@@ -45,7 +45,7 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 - Tela final: ranking dos jogadores, vencedor, **Top 100 completo revelado**, "jogar novamente" (mesma sala; o host escolhe **repetir o tema** — mesmo ranking, inclusive o gerado por IA — ou **tema aleatório**) e "nova sala".
 
 ## §7 Segredo do ranking (invariante — ADR-0002)
-- O ranking **nunca** trafega para o cliente enquanto `status ≠ FINISHED`. A API responde o estado do jogo **sem** o campo `ranking` (e sem nada que o derive) durante a partida.
+- O ranking **nunca** trafega para o cliente enquanto `status ≠ FINISHED`. A API responde o estado do jogo **sem** o campo `ranking` (e sem nada que o derive) durante a partida. Única exceção: `rankingSize` (só a quantidade de itens, não revela nenhum).
 - A conferência do palpite acontece só no servidor.
 
 ## §8 Estados da partida
