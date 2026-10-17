@@ -5,6 +5,7 @@ import {
   getGameByCodeHandler,
   getGameHandler,
   joinGameHandler,
+  pauseRoundHandler,
   rematchGameHandler,
   startGameHandler,
   submitAnswerHandler,
@@ -18,5 +19,7 @@ gamesRoutes.get('/:id', getGameHandler);
 gamesRoutes.post('/join', joinGameHandler);
 gamesRoutes.post('/:id/start', startGameHandler);
 gamesRoutes.post('/:id/answer', submitAnswerHandler);
+gamesRoutes.post('/:id/pause', pauseRoundHandler(true));
+gamesRoutes.post('/:id/resume', pauseRoundHandler(false));
 gamesRoutes.post('/:id/advance', advanceRoundHandler);
 gamesRoutes.post('/:id/rematch', rematchGameHandler);

@@ -109,6 +109,30 @@ export async function startGame(id: string, playerId: string) {
 }
 
 //
+// PAUSE / RESUME (só o host)
+//
+export async function setRoundPaused(
+  id: string,
+  playerId: string,
+  paused: boolean,
+) {
+  const response = await fetch(
+    `${API_URL}/games/${id}/${paused ? "pause" : "resume"}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId }),
+    },
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error || "Failed to pause game");
+  }
+  return response.json();
+}
+
+//
 // SUBMIT ANSWER
 //
 export async function submitAnswer(
@@ -142,11 +166,17 @@ export async function advanceRound(gameId: string) {
 //
 // REMATCH (jogar novamente na mesma sala)
 //
-export async function rematchGame(gameId: string, playerId: string) {
+export async function rematchGame(
+  gameId: string,
+  playerId: string,
+  sameTheme: boolean,
+) {
   const response = await fetch(`${API_URL}/games/${gameId}/rematch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId, random: true }),
+    body: JSON.stringify(
+      sameTheme ? { playerId, sameTheme: true } : { playerId, random: true },
+    ),
   });
 
   if (!response.ok) {

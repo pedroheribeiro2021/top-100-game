@@ -46,6 +46,8 @@ export type Game = {
   currentRoundAnswers: RoundAnswer[];
   roundHistory?: RoundHistoryEntry[];
   roundDeadlineAt?: string | null;
+  /** Tempo restante (ms) congelado enquanto o host pausa a rodada; null = rodando. */
+  roundPausedRemainingMs?: number | null;
   status: GameStatus;
   roundPhase: RoundPhase;
   winner?: Player | null;
@@ -53,6 +55,6 @@ export type Game = {
   tiedPlayerIds?: string[];
   /** Id do jogo criado por "jogar novamente", se algum host já iniciou um. */
   rematchGameId?: string | null;
-  rankingSource?: "bank" | "groq" | "openrouter";
+  rankingSource?: "bank" | "gemini" | "groq" | "openrouter";
   rankingWarning?: string | null;
 };

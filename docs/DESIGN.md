@@ -15,18 +15,18 @@ Fonte: protótipo Figma <https://dodge-sorbet-20715481.figma.site> (navegado em 
 ## Fluxo de telas (todas as ações, do protótipo)
 1. **ONBOARDING** — 3 cartões: como funciona / quanto mais baixo melhor (pos 1 = 1pt, pos 98 = 98pts) / vença a partida. Ação: COMEÇAR.
 2. **HOME** — CRIAR SALA · ENTRAR NA SALA.
-3A. **CRIAR SALA** — tema em duas etapas (escolhe categoria → escolhe tema dentro da categoria; "← voltar às categorias" para trocar) ou digita um tema livre (gerado por IA se não houver tema pronto; busca ambígua mostra sugestões na tela, sem alerta) / "TEMA ALEATÓRIO"; rodadas (3/5/7/10); tempo (atalhos 15/30/45/60s ou "Personalizado" com input em segundos/minutos); CRIAR (desabilitado sem tema).
+3A. **CRIAR SALA** — tema em duas etapas (escolhe categoria — blocos coloridos cyan/amarelo/pink com ícone em chip, borda grossa e sombra dura; temas em linhas com borda escura e sombra curta → escolhe tema dentro da categoria; "← voltar às categorias" para trocar) ou digita um tema livre (gerado por IA se não houver tema pronto; busca ambígua mostra sugestões na tela, sem alerta) / "TEMA ALEATÓRIO"; rodadas (3/5/7/10); tempo (atalhos 15/30/45/60s ou "Personalizado" com input em segundos/minutos); CRIAR (desabilitado sem tema).
 3B. **ENTRAR NA SALA** — código (6 chars) + nome, ENTRAR.
 4. **LOBBY** — código da sala grande + botão copiar; card do tema com rodadas/tempo; lista de jogadores (2–5) com coroa no host; status "AGUARDANDO"; INICIAR PARTIDA (só host).
-5. **JOGANDO** — card do tema com "Rodada N de M" e pontos; barra de TEMPO regressiva; campo "SEU PALPITE" + CONFIRMAR PALPITE; PLACAR ao vivo (#1/#2/#3 com cores pink/amarelo/cyan); rodapé com a dica das regras; lista de itens já usados.
+5. **JOGANDO** — card do tema com "Rodada N de M" e pontos; barra de TEMPO regressiva; host tem PAUSAR/RETOMAR (faixa amarela "PARTIDA PAUSADA" para todos, palpite desabilitado); campo "SEU PALPITE" + CONFIRMAR PALPITE; PLACAR ao vivo (#1/#2/#3 com cores pink/amarelo/cyan); rodapé com a dica das regras; lista de itens já usados.
 6. **REVELAÇÃO** — banner "RESULTADO DA RODADA N" (gradiente amarelo→laranja); card por jogador: palpite, ✓/✗, posição e pontos; PRÓXIMA RODADA (ou resultado final).
 7. **VERIFICAÇÃO** — sistema calcula líder e detecta empate (sem tela própria).
 8A. **MORTE SÚBITA** — mesma mecânica, até desempatar.
-8B. **FIM DE JOGO** — ranking final, vencedor, VER TOP 100 COMPLETO, JOGAR NOVAMENTE, NOVA SALA, SAIR.
+8B. **FIM DE JOGO** — ranking final, vencedor, VER TOP 100 COMPLETO, REPETIR O TEMA / JOGAR COM TEMA ALEATÓRIO (só host), NOVA SALA, SAIR. Faixa "tema gerado por IA" só aparece quando `rankingSource ≠ bank`.
 
 ## Loops e saídas
 - Rodadas: JOGANDO → REVELAÇÃO → JOGANDO (até a última) → VERIFICAÇÃO → MORTE SÚBITA ou FIM.
-- Replay: FIM → JOGAR NOVAMENTE → JOGANDO.
+- Replay: FIM → REPETIR O TEMA / TEMA ALEATÓRIO → LOBBY → JOGANDO.
 - Voltar para HOME a partir de criar/entrar/lobby/fim.
 
 ## Estado da implementação

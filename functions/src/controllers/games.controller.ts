@@ -9,6 +9,7 @@ import {
   submitAnswer,
   advanceRound,
   rematchGame,
+  setRoundPaused,
   ThemeNotFoundError,
   ALLOWED_ROUND_COUNTS,
   MIN_ROUND_TIME_LIMIT_SECONDS,
@@ -228,6 +229,10 @@ export async function submitAnswerHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Tempo da rodada esgotado' });
     }
 
+    if (error.message === 'ROUND_PAUSED') {
+      return res.status(409).json({ error: 'Partida pausada pelo host' });
+    }
+
     if (error.message === 'NOT_IN_SUDDEN_DEATH') {
       return res
         .status(403)
@@ -237,6 +242,45 @@ export async function submitAnswerHandler(req: Request, res: Response) {
     console.error(error);
     return res.status(400).json({ error: error.message });
   }
+}
+
+export function pauseRoundHandler(paused: boolean) {
+  return async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { playerId } = req.body;
+
+      if (!playerId) {
+        return res.status(400).json({ error: 'playerId is required' });
+      }
+
+      const game = await setRoundPaused(id, playerId, paused);
+
+      return res.status(200).json(toPublicGame(game));
+    } catch (error: any) {
+      if (error.message === 'GAME_NOT_FOUND') {
+        return res.status(404).json({ error: 'Game not found' });
+      }
+
+      if (error.message === 'NOT_HOST') {
+        return res
+          .status(403)
+          .json({ error: 'Apenas o host pode pausar a partida' });
+      }
+
+      if (
+        error.message === 'INVALID_GAME_STATE' ||
+        error.message === 'ROUND_EXPIRED'
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'Não há rodada em andamento para pausar' });
+      }
+
+      console.error(error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  };
 }
 
 /**
@@ -270,13 +314,18 @@ export async function advanceRoundHandler(req: Request, res: Response) {
 export async function rematchGameHandler(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { playerId, theme, themeId, random } = req.body;
+    const { playerId, theme, themeId, random, sameTheme } = req.body;
 
     if (!playerId) {
       return res.status(400).json({ error: 'playerId is required' });
     }
 
-    const newGame = await rematchGame(id, playerId, { theme, themeId, random });
+    const newGame = await rematchGame(id, playerId, {
+      theme,
+      themeId,
+      random,
+      sameTheme: sameTheme === true,
+    });
 
     return res.status(201).json(toPublicGame(newGame));
   } catch (error: any) {

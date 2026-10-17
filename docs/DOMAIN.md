@@ -18,13 +18,16 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 ## §3 Rodada
 - Fase ANSWERING: todos palpitam dentro do tempo. 1 palpite por jogador por rodada.
 - Rodada fecha quando **todos responderam** ou o **tempo expira** (quem não respondeu marca 0).
+- **Pausa**: o host pode pausar e retomar o cronômetro durante ANSWERING. Pausado, o tempo restante fica congelado e palpites são recusados; ao retomar, o prazo é recalculado a partir do tempo que sobrou.
 - Fase RESULT (revelação): mostra o palpite de cada jogador, acerto/erro, posição no ranking e pontos.
 - Depois da revelação: próxima rodada, ou verificação de fim (§6).
 
 ## §4 Pontuação e matching
 - Acerto: pontos = posição do item (1–100). Erro (fora do Top 100): 0 pontos.
-- **Item vale uma vez por partida** (global): item já pontuado por qualquer jogador em qualquer rodada não pontua de novo. Palpite repetido = 0 pontos, marcado como "já usado" na revelação.
-- Matching é **normalizado**: caixa baixa, sem acentos, trim, espaços colapsados; e considera os `aliases` do item (ex.: "NYC" → "Nova York"). Ver `db/SCHEMA.md`.
+- **Item vale uma vez por partida** (global): item já pontuado por qualquer jogador em uma rodada **anterior** não pontua de novo. Palpite repetido = 0 pontos, marcado como "já usado" na revelação.
+- **Mesmo item na mesma rodada pontua para todos** que o acertaram (não só para quem enviou primeiro). A partir da rodada seguinte, ele passa a valer 0.
+- Matching é **normalizado**: caixa baixa, sem acentos, trim, espaços colapsados, pontuação que separa palavras (hífen, barra, ponto, apóstrofo…) tratada como espaço; e considera os `aliases` do item (ex.: "NYC" → "Nova York"). Ver `db/SCHEMA.md`.
+- A comparação ignora espaços: grafias igualmente válidas casam entre si ("he man" = "He-Man" = "heman"; "mcdonalds" = "McDonald's"; "acdc" = "AC/DC"). Palavra parcial não casa ("man" ≠ "He-Man").
 - Empate de string após normalização = acerto. Não usar igualdade exata crua.
 
 ## §5 Temas e rankings (invariante — ADR-0001)
@@ -36,7 +39,7 @@ Party game multiplayer de **rankings ocultos**. Uma sala tem um tema ("Top 100 m
 ## §6 Fim de jogo e empate
 - Após a última rodada: maior pontuação vence.
 - **Empate na liderança → morte súbita**: rodada extra com a mesma mecânica, só entre os empatados; repete até desempatar.
-- Tela final: ranking dos jogadores, vencedor, **Top 100 completo revelado**, "jogar novamente" (mesma sala/novo tema) e "nova sala".
+- Tela final: ranking dos jogadores, vencedor, **Top 100 completo revelado**, "jogar novamente" (mesma sala; o host escolhe **repetir o tema** — mesmo ranking, inclusive o gerado por IA — ou **tema aleatório**) e "nova sala".
 
 ## §7 Segredo do ranking (invariante — ADR-0002)
 - O ranking **nunca** trafega para o cliente enquanto `status ≠ FINISHED`. A API responde o estado do jogo **sem** o campo `ranking` (e sem nada que o derive) durante a partida.
